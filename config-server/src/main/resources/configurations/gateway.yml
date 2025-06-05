@@ -1,0 +1,77 @@
+eureka:
+  instance:
+    hostname: osroom-discovery-1
+  client:
+    service-url:
+      defaultZone: http://osroom-discovery-1:8761/eureka
+jwt:
+  auth:
+    converter:
+      resource-id: backendgateway
+      principle-attribute: preferred_username
+server:
+  port: 8222
+spring:
+  zipkin:
+    base-url: http://zipkin:9411
+    enabled: true
+    sleuth:
+      sampler:
+        probability: 1.0
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/osRoom
+          jwk-set-uri: http://keycloak:8080/realms/osRoom/protocol/openid-connect/certs
+  application:
+    name: gateway
+
+  cloud:
+    gateway:
+
+      discovery:
+        locator:
+          enabled: true
+      routes:
+        - id: students
+          uri: http://osroom-student-1:8090
+          predicates:
+            - Path=/api/v1/students/**
+        - id: schools
+          uri: http://osroom-school-1:8070
+          predicates:
+            - Path=/api/v1/schools/**
+        - id: classrooms
+          uri: http://osroom-classrooms-1:8000
+          predicates:
+            - Path=/api/v1/classrooms/**
+        - id: activities
+          uri: http://osroom-activities-1:8010
+          predicates:
+            - Path=/api/v1/activities/**
+
+        - id: file-storage
+          uri: http://osroom-file-storage-1:8030
+          predicates:
+            - Path=/api/v1/file-storage/**
+
+        - id: activitiesresponses
+          uri: http://osroom-activitiesresponses-1:8020
+          predicates:
+            - Path=/api/v1/activitiesresponses/**
+            
+        - id: gestion-nap
+          uri: http://osroom-gestion-nap-1:8226
+          predicates:
+            - Path=/api/v1/anuncios/**, /api/v1/notificaciones/**, /api/v1/asistencias/**, /api/v1/calificaciones/**
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    org.springframework.security: DEBUG

@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: gestion-nap
+  config:
+    import: optional:configserver:http://config-server:8888
+  cloud:
+    config:
+      enabled: true
+      uri: http://config-server:8888
+      fail-fast: true
+      retry:
+        max-attempts: 20
+        max-interval: 15000
+        initial-interval: 10000
+  datasource:
+    url: jdbc:postgresql://postgres:5432/gestion_nap
+    username: alibou
+    password: alibou
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      auto-commit: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        connection:
+          provider_disables_autocommit: false
+    show-sql: true
+    open-in-view: false
+
+server:
+  port: 8226
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery:8761/eureka
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    hostname: gestion-nap
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    root: INFO
+    com.osroom.gestionnap: DEBUG
+    com.osroom.gestionnap.client: DEBUG
+    org.springframework.web: DEBUG
+    feign: DEBUG
+    org.springframework.cloud.openfeign: DEBUG
+    org.springframework.transaction: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE
+
+app:
+  keycloak:
+    server-url: ${KEYCLOAK_URL:http://keycloak:8080}
+    realm: ${KEYCLOAK_REALM:osRoom}
+    client-id: ${KEYCLOAK_CLIENT_ID:gestion-nap}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:secret}
+  services:
+    classrooms-url: ${CLASSROOMS_URL:http://localhost:8000}
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 10000
+        readTimeout: 30000
+        loggerLevel: full 

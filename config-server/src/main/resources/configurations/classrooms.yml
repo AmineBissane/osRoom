@@ -1,0 +1,31 @@
+eureka:
+  instance:
+    hostname: osroom-discovery-1
+  client:
+    service-url:
+      defaultZone: http://osroom-discovery-1:8761/eureka
+
+
+server:
+  port: 8000
+spring:
+  zipkin:
+    base-url: http://host.docker.internal:9411
+    enabled: true
+  application:
+    name: classrooms
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://postgresql:5432/classrooms
+    username: alibou
+    password: alibou
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0

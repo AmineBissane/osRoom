@@ -1,0 +1,1350 @@
+% OsRoom Educational Platform - Technical Documentation
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+% Page settings
+\geometry{margin=2.5cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\rhead{\thepage}
+\lhead{OsRoom Educational Platform}
+\lfoot{Documentation v1.0}
+\rfoot{\today}
+
+% Title formatting
+\titleformat{\chapter}[display]
+{\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{50pt}{40pt}
+
+% Code listing settings
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.95}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+% Document begins
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \begin{center}
+        \vspace*{4cm}
+        
+        \textbf{\LARGE Documentación Técnica}\\
+        \vspace{1.5cm}
+        \textbf{\Huge OsRoom Educational Platform}\\
+        \vspace{0.5cm}
+        \textbf{\large Sistema de Gestión Educativa}\\
+        \vspace{1.5cm}
+        
+        \includegraphics[width=0.4\textwidth]{example-image}\\
+        \vspace{1.5cm}
+        
+        \textbf{\Large Documentación completa de la plataforma}\\
+        \vspace{0.8cm}
+        \textbf{\large Frontend (apptest) y Backend (osRoom)}\\
+        \vspace{2cm}
+        
+        \textbf{\today}\\
+        \vspace{0.5cm}
+        \textbf{Versión 1.0}\\
+    \end{center}
+\end{titlepage}
+
+% Table of contents
+\tableofcontents
+\listoffigures
+\listoftables
+
+% Chapter 1: Introduction
+\chapter{Introducción}
+\section{Propósito del documento}
+Este documento proporciona una documentación técnica completa de la plataforma educativa OsRoom, un sistema moderno de gestión educativa desarrollado con una arquitectura de microservicios. La plataforma consta de dos componentes principales: el frontend (apptest) desarrollado con Next.js y el backend (osRoom) implementado con Spring Boot.
+
+\section{Visión general del sistema}
+OsRoom es una plataforma educativa integral diseñada para facilitar la gestión de aulas virtuales, actividades académicas, estudiantes y profesores. La plataforma permite la creación y administración de cursos, asignación y calificación de actividades, gestión de archivos, y comunicación entre estudiantes y profesores.
+
+\section{Audiencia objetivo}
+Esta documentación está dirigida a:
+\begin{itemize}
+    \item Desarrolladores que trabajarán en el mantenimiento y evolución del sistema
+    \item Administradores de sistemas encargados de la implementación y operación
+    \item Personal técnico que necesite comprender la arquitectura y funcionamiento del sistema
+\end{itemize}
+
+\section{Alcance del proyecto}
+El proyecto abarca:
+\begin{itemize}
+    \item Frontend web responsivo para estudiantes y profesores
+    \item Backend basado en microservicios para la gestión de datos y lógica de negocio
+    \item Sistemas de autenticación y autorización
+    \item Gestión de archivos y documentos
+    \item Sistema de calificación y seguimiento académico
+\end{itemize}
+
+% Chapter 2: Architecture Overview
+\chapter{Arquitectura del Sistema}
+\section{Visión general de la arquitectura}
+OsRoom utiliza una arquitectura moderna de microservicios para el backend y una aplicación de página única (SPA) para el frontend. Esta separación permite una mayor escalabilidad, mantenibilidad y desarrollo independiente de los componentes.
+
+\section{Diagrama de arquitectura}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{example-image}
+    \caption{Diagrama de arquitectura general del sistema OsRoom}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Patrones de diseño}
+El sistema implementa varios patrones de diseño:
+\begin{itemize}
+    \item \textbf{Microservicios}: Separación de la lógica de negocio en servicios independientes
+    \item \textbf{API Gateway}: Punto único de entrada para todas las solicitudes de clientes
+    \item \textbf{Service Discovery}: Registro y descubrimiento automático de servicios
+    \item \textbf{Config Server}: Gestión centralizada de configuración
+    \item \textbf{Circuit Breaker}: Manejo de fallos y degradación controlada
+    \item \textbf{Component-Based Architecture}: En el frontend para facilitar la reutilización
+\end{itemize}
+
+\section{Tecnologías utilizadas}
+\subsection{Frontend}
+\begin{itemize}
+    \item Next.js 15.x (React 19.x)
+    \item TypeScript
+    \item Tailwind CSS
+    \item Radix UI
+    \item ShadcnUI
+    \item Axios para peticiones HTTP
+    \item JWT para autenticación
+\end{itemize}
+
+\subsection{Backend}
+\begin{itemize}
+    \item Java 17
+    \item Spring Boot 3.x
+    \item Spring Cloud (Netflix Eureka, Config Server, Gateway)
+    \item PostgreSQL
+    \item Keycloak para autenticación y autorización
+    \item Docker y Docker Compose
+    \item Zipkin para trazabilidad distribuida
+\end{itemize}
+
+% Continuar con más capítulos...
+
+\chapter{Frontend (apptest)}
+\section{Estructura del proyecto}
+La aplicación frontend está desarrollada con Next.js 15.x, utilizando TypeScript y siguiendo una arquitectura basada en componentes. La estructura del proyecto está organizada de la siguiente manera:
+
+\begin{itemize}
+    \item \textbf{/src}: Directorio principal del código fuente
+    \begin{itemize}
+        \item \textbf{/app}: Contiene las páginas y rutas de la aplicación (App Router)
+        \item \textbf{/components}: Componentes reutilizables de la interfaz de usuario
+        \item \textbf{/lib}: Funciones de utilidad y lógica de negocio
+        \item \textbf{/utils}: Funciones auxiliares y helpers
+        \item \textbf{/types}: Definiciones de tipos TypeScript
+    \end{itemize}
+    \item \textbf{/public}: Archivos estáticos como imágenes, favicons, etc.
+    \item \textbf{/node\_modules}: Dependencias del proyecto
+    \item \textbf{tailwind.config.ts}: Configuración de Tailwind CSS
+    \item \textbf{next.config.js}: Configuración de Next.js
+    \item \textbf{package.json}: Dependencias y scripts del proyecto
+\end{itemize}
+
+\section{App Router y Sistema de Rutas}
+Next.js 15.x utiliza el App Router para la gestión de rutas, que permite definir la estructura de navegación basada en el sistema de archivos. Las principales rutas de la aplicación son:
+
+\begin{itemize}
+    \item \textbf{/}: Página principal (Dashboard)
+    \item \textbf{/login}: Autenticación de usuarios
+    \item \textbf{/courses}: Listado de cursos disponibles
+    \item \textbf{/class/[id]}: Página de un aula específica
+    \item \textbf{/activity/[id]}: Visualización de una actividad
+    \item \textbf{/profile}: Perfil del usuario
+    \item \textbf{/settings}: Configuración de la cuenta
+    \item \textbf{/admin}: Panel de administración
+    \item \textbf{/test-activity}: Ejemplo de actividad de prueba
+    \item \textbf{/schedule}: Horario y calendario
+    \item \textbf{/assignments}: Tareas asignadas
+\end{itemize}
+
+\section{Componentes principales}
+\subsection{Componentes de Layout}
+\subsubsection{Navbar}
+El componente \texttt{navbar.tsx} implementa la barra de navegación superior que se muestra en todas las páginas. Proporciona:
+
+\begin{itemize}
+    \item Logo y título de la aplicación
+    \item Barra de búsqueda
+    \item Selector de tema claro/oscuro
+    \item Notificaciones
+    \item Menú de usuario con opciones de perfil, configuración y cierre de sesión
+\end{itemize}
+
+\begin{lstlisting}[language=JavaScript, caption=Estructura del componente Navbar]
+export function Navbar() {
+  const router = useRouter()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    const token = Cookies.get('access_token')
+    if (token) {
+      const decoded = decodeJWT(token)
+      setUserProfile(decoded)
+    }
+  }, [])
+
+  const handleLogout = () => {
+    // Clear all cookies
+    Cookies.remove('access_token')
+    Cookies.remove('refresh_token')
+    Cookies.remove('id_token')
+    
+    // Redirect to login page
+    router.push('/login')
+  }
+  
+  // ...resto del componente
+}
+\end{lstlisting}
+
+\subsubsection{Sidebar}
+El componente \texttt{sidebar.tsx} implementa la barra lateral que proporciona navegación contextual. Incluye:
+
+\begin{itemize}
+    \item Enlaces a las diferentes secciones de la aplicación
+    \item Separación de secciones por categorías
+    \item Estado activo para la ruta actual
+    \item Versión responsive que se puede colapsar en dispositivos móviles
+\end{itemize}
+
+\subsection{Componentes de UI}
+La aplicación utiliza una combinación de componentes personalizados y componentes de Radix UI a través de ShadcnUI. Estos incluyen:
+
+\begin{itemize}
+    \item \textbf{Button}: Botones con diferentes variantes (primary, secondary, ghost)
+    \item \textbf{Card}: Tarjetas para mostrar información estructurada
+    \item \textbf{Dialog}: Diálogos modales para interacciones específicas
+    \item \textbf{Avatar}: Componente para mostrar imágenes de perfil
+    \item \textbf{DropdownMenu}: Menús desplegables
+    \item \textbf{Tabs}: Pestañas para organizar contenido
+    \item \textbf{Toast}: Notificaciones emergentes
+\end{itemize}
+
+\subsection{Componentes específicos de la aplicación}
+\subsubsection{DocumentViewer}
+Componente para visualizar documentos y archivos adjuntos de las actividades.
+
+\subsubsection{Activity Forms}
+Serie de componentes para la creación, edición y resolución de actividades académicas:
+\begin{itemize}
+    \item \texttt{activity-form-example.tsx}: Formulario ejemplo para crear actividades
+    \item \texttt{activity-solution-docs.tsx}: Visualización de soluciones
+    \item \texttt{array-test-form.tsx}: Formulario para pruebas de tipo array
+    \item \texttt{activity-debug-form.tsx}: Formulario para depuración de actividades
+\end{itemize}
+
+\section{Gestión de estado}
+La aplicación utiliza principalmente React hooks para la gestión de estado local y Context API para estados globales. Los principales estados gestionados son:
+
+\begin{itemize}
+    \item \textbf{Estado de autenticación}: Gestión de tokens JWT y sesión de usuario
+    \item \textbf{Estado de tema}: Preferencia de tema claro/oscuro
+    \item \textbf{Estado de UI}: Gestión de modales, notificaciones y estado de carga
+    \item \textbf{Estado de datos}: Caché de datos obtenidos del backend
+\end{itemize}
+
+\section{Sistema de autenticación}
+La autenticación se implementa mediante tokens JWT que se almacenan en cookies. El flujo de autenticación es:
+
+\begin{enumerate}
+    \item El usuario introduce credenciales en la página de login
+    \item La aplicación envía las credenciales al endpoint de autenticación
+    \item El servidor valida las credenciales y devuelve tokens (access, refresh, id)
+    \item Los tokens se almacenan en cookies para futuras peticiones
+    \item El \texttt{middleware.ts} verifica la validez de los tokens en cada navegación
+    \item Si el token ha expirado, se utiliza el refresh token para obtener uno nuevo
+\end{enumerate}
+
+\begin{lstlisting}[language=JavaScript, caption=Función de autenticación en lib/auth.ts]
+export async function refreshAccessToken() {
+  try {
+    const refreshToken = Cookies.get('refresh_token')
+    
+    if (!refreshToken) {
+      throw new Error('No refresh token available')
+    }
+    
+    const response = await fetch('http://localhost:8222/api/v1/auth/refresh-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to refresh token')
+    }
+    
+    const data = await response.json()
+    
+    Cookies.set('access_token', data.accessToken)
+    
+    return data.accessToken
+  } catch (error) {
+    console.error('Error refreshing token:', error)
+    return null
+  }
+}
+\end{lstlisting}
+
+\section{Comunicación con el backend}
+La comunicación con el backend se realiza a través de una capa de abstracción de API implementada en \texttt{lib/api-client.ts} y \texttt{utils/api.ts}. Estas clases proporcionan:
+
+\begin{itemize}
+    \item Funciones específicas para cada endpoint del backend
+    \item Manejo automático de tokens de autenticación
+    \item Gestión de errores y reintentos
+    \item Renovación automática de tokens expirados
+\end{itemize}
+
+Ejemplo de función para obtener aulas por categoría:
+
+\begin{lstlisting}[language=JavaScript, caption=Función para obtener aulas por categoría]
+export async function fetchClassroomsByCategory() {
+  try {
+    const token = Cookies.get('access_token');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+    
+    const response = await fetch('http://localhost:8222/api/v1/classrooms', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching classrooms:', error);
+    throw error;
+  }
+}
+\end{lstlisting}
+
+\section{Diseño responsive}
+La aplicación está diseñada para adaptarse a diferentes tamaños de pantalla, desde dispositivos móviles hasta pantallas de escritorio. Esto se logra mediante:
+
+\begin{itemize}
+    \item Uso de Tailwind CSS para diseño responsive
+    \item Puntos de interrupción (breakpoints) para diferentes tamaños de pantalla
+    \item Componentes adaptables que cambian su presentación según el dispositivo
+    \item Navegación colapsable en dispositivos móviles
+\end{itemize}
+
+\section{Temas y estilos}
+La aplicación utiliza Tailwind CSS para los estilos, con un sistema de temas claro/oscuro implementado con next-themes. Los principales aspectos del sistema de estilos son:
+
+\begin{itemize}
+    \item Configuración personalizada en \texttt{tailwind.config.ts}
+    \item Componentes estilizados con class-variance-authority para variantes
+    \item Sistema de colores y espaciado consistente
+    \item Transiciones y animaciones para mejorar la experiencia de usuario
+\end{itemize}
+
+\begin{lstlisting}[language=JavaScript, caption=Configuración del proveedor de temas]
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {children}
+    </NextThemesProvider>
+  )
+}
+\end{lstlisting}
+
+\chapter{Backend (osRoom)}
+\section{Arquitectura de microservicios}
+El backend de OsRoom está implementado siguiendo una arquitectura de microservicios utilizando Spring Boot y Spring Cloud. Esta arquitectura proporciona varios beneficios como escalabilidad, resiliencia, y desarrollo independiente de los servicios.
+
+\subsection{Componentes principales}
+\begin{itemize}
+    \item \textbf{API Gateway}: Punto único de entrada para todas las solicitudes de los clientes
+    \item \textbf{Discovery Server}: Implementado con Eureka para el registro y descubrimiento de servicios
+    \item \textbf{Config Server}: Centraliza la configuración de todos los microservicios
+    \item \textbf{Microservicios específicos}: Servicios especializados para diferentes dominios
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{example-image}
+    \caption{Arquitectura de microservicios de OsRoom}
+    \label{fig:microservices}
+\end{figure}
+
+\subsection{Diagrama de servicios}
+El backend está compuesto por los siguientes servicios:
+
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{|l|l|p{8cm}|}
+        \hline
+        \textbf{Servicio} & \textbf{Puerto} & \textbf{Descripción} \\
+        \hline
+        Gateway & 8222 & API Gateway para enrutamiento y seguridad \\
+        \hline
+        Discovery & 8761 & Registro y descubrimiento de servicios con Eureka \\
+        \hline
+        Config Server & 8888 & Gestión centralizada de configuración \\
+        \hline
+        Student & 8090 & Gestión de estudiantes y sus datos \\
+        \hline
+        School & 8070 & Gestión de escuelas e instituciones \\
+        \hline
+        Classrooms & 8000 & Gestión de aulas virtuales \\
+        \hline
+        Activities & 8010 & Gestión de actividades académicas \\
+        \hline
+        ActivitiesResponses & 8020 & Gestión de respuestas a actividades \\
+        \hline
+        File-Storage & 8030 & Almacenamiento y gestión de archivos \\
+        \hline
+        Gestion-NAP & 8226 & Gestión de NAPs (Niveles de Aprendizaje y Progreso) \\
+        \hline
+    \end{tabular}
+    \caption{Microservicios y sus puertos}
+    \label{tab:services}
+\end{figure}
+
+\section{Microservicios}
+\subsection{API Gateway}
+El API Gateway actúa como punto de entrada único para todas las solicitudes de los clientes. Implementado con Spring Cloud Gateway, proporciona:
+
+\begin{itemize}
+    \item Enrutamiento de solicitudes a los microservicios apropiados
+    \item Balanceo de carga
+    \item Filtros de seguridad para autenticación y autorización
+    \item Limitación de tasa (rate limiting)
+    \item Registro de solicitudes
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Configuración de rutas en el API Gateway]
+@Configuration
+public class GatewayConfig {
+    
+    @Bean
+    public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+        return builder.routes()
+            .route("student-service", r -> r
+                .path("/api/v1/students/**")
+                .filters(f -> f
+                    .rewritePath("/api/v1/students/(?<segment>.*)", "/api/v1/${segment}")
+                    .addResponseHeader("X-Response-Time", LocalDateTime.now().toString()))
+                .uri("lb://STUDENT-SERVICE"))
+            .route("classroom-service", r -> r
+                .path("/api/v1/classrooms/**")
+                .filters(f -> f
+                    .rewritePath("/api/v1/classrooms/(?<segment>.*)", "/api/v1/${segment}")
+                    .addResponseHeader("X-Response-Time", LocalDateTime.now().toString()))
+                .uri("lb://CLASSROOM-SERVICE"))
+            // Más rutas para otros servicios
+            .build();
+    }
+}
+\end{lstlisting}
+
+\subsection{Discovery Server}
+Implementado con Netflix Eureka, el servidor de descubrimiento permite el registro automático de servicios y su localización dinámica. Características:
+
+\begin{itemize}
+    \item Registro automático de servicios
+    \item Descubrimiento de servicios para comunicación inter-servicios
+    \item Monitoreo de estado (health checking)
+    \item Interfaz web para visualización de servicios registrados
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Configuración del servidor Eureka]
+@SpringBootApplication
+@EnableEurekaServer
+public class DiscoveryApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DiscoveryApplication.class, args);
+    }
+}
+\end{lstlisting}
+
+\subsection{Config Server}
+El servidor de configuración centraliza la gestión de propiedades para todos los microservicios:
+
+\begin{itemize}
+    \item Almacenamiento centralizado de configuración
+    \item Configuración específica por entorno (dev, test, prod)
+    \item Actualización dinámica de configuración
+    \item Cifrado de propiedades sensibles
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Configuración del Config Server]
+@SpringBootApplication
+@EnableConfigServer
+public class ConfigServerApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+}
+\end{lstlisting}
+
+\subsection{Microservicio de Estudiantes}
+El microservicio de estudiantes gestiona toda la información relacionada con los estudiantes:
+
+\begin{itemize}
+    \item Registro y gestión de datos de estudiantes
+    \item Asignación a aulas y cursos
+    \item Seguimiento de progreso académico
+    \item Gestión de perfiles de estudiantes
+\end{itemize}
+
+\subsection{Microservicio de Escuelas}
+Gestiona la información relacionada con las instituciones educativas:
+
+\begin{itemize}
+    \item Registro y gestión de escuelas
+    \item Administración de departamentos y programas académicos
+    \item Gestión de calendarios escolares
+    \item Administración de personal docente
+\end{itemize}
+
+\subsection{Microservicio de Aulas}
+El microservicio de aulas gestiona las aulas virtuales donde se imparten los cursos:
+
+\begin{itemize}
+    \item Creación y gestión de aulas virtuales
+    \item Asignación de estudiantes y profesores
+    \item Organización de contenido educativo
+    \item Gestión de categorías y temas
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Modelo de datos de Classroom]
+@Entity
+@Table(name = "classrooms")
+public class Classroom {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    
+    private String description;
+    
+    @ElementCollection
+    private List<Long> activitiesIds;
+    
+    @ElementCollection
+    private List<Long> studentsIds;
+    
+    private Long teacherId;
+    
+    private String category;
+    
+    private LocalDateTime createdAt;
+    
+    private boolean active;
+    
+    // Getters y setters
+}
+\end{lstlisting}
+
+\subsection{Microservicio de Actividades}
+Gestiona las actividades académicas asignadas a los estudiantes:
+
+\begin{itemize}
+    \item Creación y gestión de actividades
+    \item Asignación a aulas específicas
+    \item Configuración de fechas límite
+    \item Gestión de recursos asociados
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Controlador de Actividades]
+@RestController
+@RequestMapping("/api/v1")
+public class ActivityController {
+    
+    private final ActivityService activityService;
+    
+    @Autowired
+    public ActivityController(ActivityService activityService) {
+        this.activityService = activityService;
+    }
+    
+    @GetMapping("/activities")
+    public ResponseEntity<List<Activity>> getAllActivities() {
+        return ResponseEntity.ok(activityService.findAll());
+    }
+    
+    @GetMapping("/activities/{id}")
+    public ResponseEntity<Activity> getActivityById(@PathVariable Long id) {
+        return activityService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @GetMapping("/activities/classrooms/{classroomId}")
+    public ResponseEntity<List<Activity>> getActivitiesByClassroomId(@PathVariable Long classroomId) {
+        return ResponseEntity.ok(activityService.findByClassroomId(classroomId));
+    }
+    
+    @PostMapping("/activities")
+    public ResponseEntity<Activity> createActivity(@RequestBody Activity activity) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(activityService.save(activity));
+    }
+    
+    // Más endpoints para actualizar y eliminar actividades
+}
+\end{lstlisting}
+
+\subsection{Microservicio de Respuestas a Actividades}
+Gestiona las respuestas de los estudiantes a las actividades asignadas:
+
+\begin{itemize}
+    \item Envío y almacenamiento de respuestas
+    \item Calificación y retroalimentación
+    \item Seguimiento de fechas de entrega
+    \item Gestión de archivos adjuntos
+\end{itemize}
+
+De acuerdo con el archivo \texttt{backend-modifications.md}, se han realizado modificaciones para añadir funcionalidades de calificación:
+
+\begin{lstlisting}[language=Java, caption=Modelo de ActivityResponse]
+@Entity
+@Table(name = "activity_responses")
+public class ActivityResponse {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private Long activityId;
+    
+    private Long studentId;
+    
+    private String content;
+    
+    private Long fileId;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+    
+    @Column(name = "grade")
+    private Double grade;
+    
+    @Column(name = "graded_at")
+    private LocalDateTime gradedAt;
+    
+    @Column(name = "graded_by")
+    private String gradedBy;
+    
+    // Getters y setters
+}
+\end{lstlisting}
+
+\subsection{Microservicio de Almacenamiento de Archivos}
+Gestiona el almacenamiento y recuperación de archivos:
+
+\begin{itemize}
+    \item Carga y descarga de archivos
+    \item Almacenamiento seguro
+    \item Gestión de metadatos
+    \item Control de acceso a archivos
+\end{itemize}
+
+\subsection{Microservicio de Gestión NAP}
+Gestiona los Niveles de Aprendizaje y Progreso (NAP):
+
+\begin{itemize}
+    \item Definición de competencias y objetivos de aprendizaje
+    \item Seguimiento de progreso de estudiantes
+    \item Evaluación basada en competencias
+    \item Generación de informes de progreso
+\end{itemize}
+
+\section{Comunicación entre microservicios}
+La comunicación entre microservicios se realiza principalmente a través de dos mecanismos:
+
+\subsection{Comunicación síncrona con OpenFeign}
+Spring Cloud OpenFeign se utiliza para las llamadas síncronas entre servicios:
+
+\begin{itemize}
+    \item Definición declarativa de clientes HTTP
+    \item Integración con el servidor de descubrimiento
+    \item Implementación de patrones de circuit breaker
+    \item Balanceo de carga del lado del cliente
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Cliente Feign para el servicio de estudiantes]
+@FeignClient(name = "student-service")
+public interface StudentClient {
+    
+    @GetMapping("/api/v1/students/{id}")
+    StudentDto getStudentById(@PathVariable("id") Long id);
+    
+    @GetMapping("/api/v1/students/classroom/{classroomId}")
+    List<StudentDto> getStudentsByClassroomId(@PathVariable("classroomId") Long classroomId);
+}
+\end{lstlisting}
+
+\subsection{Comunicación asíncrona con mensajería}
+Para operaciones que no requieren respuesta inmediata, se utiliza comunicación asíncrona:
+
+\begin{itemize}
+    \item Envío de eventos cuando ocurren cambios importantes
+    \item Procesamiento asíncrono de operaciones largas
+    \item Implementación del patrón SAGA para transacciones distribuidas
+\end{itemize}
+
+\section{Persistencia de datos}
+Cada microservicio tiene su propia base de datos para garantizar el desacoplamiento:
+
+\begin{itemize}
+    \item PostgreSQL como base de datos principal
+    \item Independencia de datos entre servicios
+    \item Transacciones locales dentro de cada servicio
+    \item Consistencia eventual entre servicios
+\end{itemize}
+
+\section{Seguridad}
+La seguridad se implementa a través de varios mecanismos:
+
+\subsection{Autenticación y autorización con Keycloak}
+Se utiliza Keycloak como proveedor de identidad y acceso:
+
+\begin{itemize}
+    \item Gestión centralizada de usuarios y roles
+    \item Autenticación basada en OAuth2 y OpenID Connect
+    \item Autorización con roles y permisos
+    \item Single Sign-On (SSO) entre servicios
+\end{itemize}
+
+\begin{lstlisting}[language=Java, caption=Configuración de seguridad con Keycloak]
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf().disable()
+            .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers("/api/v1/public/**").permitAll()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/teacher/**").hasRole("TEACHER")
+                .requestMatchers("/api/v1/student/**").hasRole("STUDENT")
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+            );
+        
+        return http.build();
+    }
+    
+    private Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
+        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
+        jwtConverter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleConverter());
+        return jwtConverter;
+    }
+}
+\end{lstlisting}
+
+\subsection{Seguridad a nivel de API Gateway}
+El API Gateway implementa medidas de seguridad adicionales:
+
+\begin{itemize}
+    \item Validación de tokens JWT
+    \item Limitación de tasa para prevenir ataques de denegación de servicio
+    \item Filtros de seguridad personalizados
+    \item Cifrado TLS/SSL para comunicaciones seguras
+\end{itemize}
+
+\section{Observabilidad}
+La plataforma implementa varias herramientas para mejorar la observabilidad:
+
+\subsection{Trazabilidad distribuida con Zipkin}
+Zipkin permite seguir el flujo de solicitudes a través de múltiples servicios:
+
+\begin{itemize}
+    \item Visualización de latencias en cada servicio
+    \item Identificación de cuellos de botella
+    \item Correlación de eventos entre servicios
+    \item Análisis de rendimiento
+\end{itemize}
+
+\subsection{Monitoreo y métricas}
+Se implementan endpoints de actuator para monitoreo:
+
+\begin{itemize}
+    \item Estado de salud de los servicios (health endpoints)
+    \item Métricas de rendimiento
+    \item Información sobre entorno y configuración
+    \item Gestión de logs centralizados
+\end{itemize}
+
+\section{Despliegue con Docker}
+La plataforma utiliza Docker y Docker Compose para facilitar el despliegue:
+
+\begin{itemize}
+    \item Contenedorización de cada microservicio
+    \item Configuración de red entre servicios
+    \item Volúmenes persistentes para datos
+    \item Orquestación con Docker Compose
+\end{itemize}
+
+\begin{lstlisting}[language=YAML, caption=Extracto de docker-compose.yml]
+services:
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8222:8222"
+    environment:
+      - SPRING_ZIPKIN_BASE-URL=http://zipkin:9411
+    networks:
+      - postgres
+    depends_on:
+      discovery:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+
+  student:
+    build:
+      context: ./student
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    networks:
+      - postgres
+    depends_on:
+      discovery:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+\end{lstlisting}
+
+\chapter{Integración Frontend-Backend}
+\section{Comunicación entre Frontend y Backend}
+La comunicación entre el frontend (apptest) y el backend (osRoom) se realiza a través de solicitudes HTTP REST utilizando el API Gateway como punto de entrada único. Esta arquitectura proporciona varias ventajas:
+
+\begin{itemize}
+    \item Desacoplamiento entre frontend y backend
+    \item Seguridad centralizada a nivel de API Gateway
+    \item Capacidad de escalar y evolucionar componentes independientemente
+    \item Simplificación de las rutas y endpoints desde la perspectiva del cliente
+\end{itemize}
+
+\section{Flujo de autenticación}
+El flujo de autenticación integra el frontend con el backend a través de Keycloak:
+
+\begin{enumerate}
+    \item El usuario introduce sus credenciales en la página de login del frontend
+    \item El frontend envía una solicitud de autenticación al API Gateway
+    \item El API Gateway redirige la solicitud al servicio de autenticación (Keycloak)
+    \item Keycloak valida las credenciales y genera tokens JWT (access, refresh, id)
+    \item Los tokens se devuelven al frontend y se almacenan en cookies
+    \item Las solicitudes posteriores incluyen el token de acceso en las cabeceras
+    \item El API Gateway valida el token antes de permitir el acceso a los microservicios
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{example-image}
+    \caption{Flujo de autenticación entre frontend y backend}
+    \label{fig:auth-flow}
+\end{figure}
+
+\section{Gestión de API}
+\subsection{Cliente API en el Frontend}
+El frontend implementa un cliente API estructurado en \texttt{lib/api-client.ts} y \texttt{utils/api.ts} que abstrae la comunicación con el backend:
+
+\begin{itemize}
+    \item Funciones específicas para cada dominio (aulas, actividades, estudiantes)
+    \item Manejo automático de tokens y autenticación
+    \item Gestión de errores y reintentos
+    \item Transformación de datos entre formatos de frontend y backend
+\end{itemize}
+
+\begin{lstlisting}[language=JavaScript, caption=Ejemplo de función API en el frontend]
+export async function fetchActivitiesByClassroomId(classroomId: number) {
+  try {
+    const token = Cookies.get('access_token');
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+    
+    const response = await fetch(`http://localhost:8222/api/v1/activities/classrooms/${classroomId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching activities:', error);
+    throw error;
+  }
+}
+\end{lstlisting}
+
+\subsection{API Gateway y enrutamiento}
+El API Gateway enruta las solicitudes a los microservicios apropiados basándose en patrones de URL:
+
+\begin{itemize}
+    \item \texttt{/api/v1/students/**} → Microservicio de Estudiantes
+    \item \texttt{/api/v1/classrooms/**} → Microservicio de Aulas
+    \item \texttt{/api/v1/activities/**} → Microservicio de Actividades
+    \item \texttt{/api/v1/activities-responses/**} → Microservicio de Respuestas
+    \item \texttt{/api/v1/files/**} → Microservicio de Almacenamiento de Archivos
+\end{itemize}
+
+\section{Flujos de datos principales}
+\subsection{Carga del dashboard}
+El flujo para cargar el dashboard del estudiante:
+
+\begin{enumerate}
+    \item El frontend solicita la lista de aulas del estudiante autenticado
+    \item El API Gateway redirige la solicitud al Microservicio de Aulas
+    \item El Microservicio de Aulas consulta internamente al Microservicio de Estudiantes
+    \item Se devuelve la información de aulas al frontend
+    \item El frontend solicita las actividades pendientes para esas aulas
+    \item El API Gateway redirige la solicitud al Microservicio de Actividades
+    \item Se devuelve la lista de actividades pendientes al frontend
+    \item El frontend renderiza el dashboard con aulas y actividades pendientes
+\end{enumerate}
+
+\subsection{Envío de respuestas a actividades}
+El flujo para que un estudiante envíe una respuesta a una actividad:
+
+\begin{enumerate}
+    \item El estudiante completa una actividad y adjunta un archivo si es necesario
+    \item Si hay un archivo, primero se carga al Microservicio de Almacenamiento
+    \item El Microservicio de Almacenamiento devuelve un ID de archivo
+    \item El frontend envía la respuesta con el ID del archivo al API Gateway
+    \item El API Gateway redirige la solicitud al Microservicio de Respuestas
+    \item El Microservicio de Respuestas guarda la respuesta y notifica al Microservicio de Actividades
+    \item Se confirma el envío exitoso al frontend
+\end{enumerate}
+
+\subsection{Calificación de actividades}
+El flujo para que un profesor califique una actividad:
+
+\begin{enumerate}
+    \item El profesor accede a la lista de respuestas pendientes de calificación
+    \item El frontend solicita las respuestas al Microservicio de Respuestas a través del API Gateway
+    \item El profesor asigna una calificación a una respuesta
+    \item El frontend envía la calificación al Microservicio de Respuestas
+    \item El Microservicio de Respuestas actualiza la respuesta con la calificación
+    \item Se notifica al estudiante sobre la nueva calificación
+\end{enumerate}
+
+\section{Manejo de errores y casos límite}
+La integración entre frontend y backend incluye mecanismos para manejar diversos escenarios de error:
+
+\begin{itemize}
+    \item \textbf{Tokens expirados}: Renovación automática usando refresh tokens
+    \item \textbf{Servicios no disponibles}: Mensajes de error apropiados y reintentos
+    \item \textbf{Problemas de red}: Detección y manejo de errores de conexión
+    \item \textbf{Errores del servidor}: Visualización de mensajes de error significativos
+    \item \textbf{Validación de datos}: Validación tanto en frontend como en backend
+\end{itemize}
+
+\begin{lstlisting}[language=JavaScript, caption=Manejo de errores en el frontend]
+try {
+  setLoading(true);
+  const data = await fetchClassroomsByCategory();
+  setClasses(data);
+} catch (error) {
+  console.error('Error fetching classes:', error);
+  
+  // Check if it's a token expiration error
+  if (error.response && error.response.status === 401) {
+    // Try to refresh the token
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      // Retry the request with the new token
+      const data = await fetchClassroomsByCategory();
+      setClasses(data);
+    } else {
+      // Redirect to login if refresh fails
+      toast.error('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+      router.push('/login');
+    }
+  } else {
+    // Handle other types of errors
+    toast.error('Error al cargar las clases. Por favor, intente nuevamente.');
+  }
+} finally {
+  setLoading(false);
+}
+\end{lstlisting}
+
+\chapter{Implementación y Despliegue}
+\section{Requisitos del sistema}
+\subsection{Requisitos de hardware}
+Los requisitos mínimos de hardware para ejecutar la plataforma completa son:
+
+\begin{itemize}
+    \item \textbf{CPU}: 4 núcleos o más
+    \item \textbf{RAM}: 8 GB mínimo, 16 GB recomendado
+    \item \textbf{Almacenamiento}: 20 GB para el sistema, más espacio adicional para archivos
+    \item \textbf{Red}: Conexión de banda ancha con al menos 10 Mbps
+\end{itemize}
+
+\subsection{Requisitos de software}
+Para ejecutar la plataforma se requiere:
+
+\begin{itemize}
+    \item \textbf{Sistema Operativo}: Linux, Windows o macOS
+    \item \textbf{Docker}: Versión 20.10 o superior
+    \item \textbf{Docker Compose}: Versión 2.0 o superior
+    \item \textbf{Java Development Kit (JDK)}: Versión 17 o superior (para desarrollo)
+    \item \textbf{Node.js}: Versión 18 o superior (para desarrollo del frontend)
+    \item \textbf{PostgreSQL}: Versión 13 o superior (si se ejecuta fuera de Docker)
+\end{itemize}
+
+\section{Proceso de instalación}
+\subsection{Despliegue con Docker Compose}
+El método recomendado para desplegar la plataforma es utilizando Docker Compose:
+
+\begin{enumerate}
+    \item Clonar el repositorio: \texttt{git clone https://github.com/usuario/osRoom.git}
+    \item Navegar al directorio del proyecto: \texttt{cd osRoom}
+    \item Construir y levantar los contenedores: \texttt{docker-compose up -d --build}
+    \item Verificar que todos los servicios estén funcionando: \texttt{docker-compose ps}
+    \item Acceder a la interfaz web de Eureka para comprobar el registro de servicios: \texttt{http://localhost:8761}
+\end{enumerate}
+
+\subsection{Configuración del frontend}
+Para configurar y desplegar el frontend:
+
+\begin{enumerate}
+    \item Navegar al directorio del frontend: \texttt{cd apptest}
+    \item Instalar dependencias: \texttt{npm install}
+    \item Configurar las variables de entorno en \texttt{.env.local}:
+    \begin{lstlisting}
+NEXT_PUBLIC_API_URL=http://localhost:8222/api/v1
+NEXT_PUBLIC_AUTH_URL=http://localhost:8222/api/v1/auth
+    \end{lstlisting}
+    \item Construir la aplicación: \texttt{npm run build}
+    \item Iniciar el servidor: \texttt{npm run start}
+\end{enumerate}
+
+\section{Entornos de despliegue}
+\subsection{Entorno de desarrollo}
+Configuración para el entorno de desarrollo:
+
+\begin{itemize}
+    \item Servicios ejecutándose en modo de desarrollo con recarga en caliente
+    \item Logs detallados para depuración
+    \item Base de datos con datos de prueba
+    \item Autenticación simplificada para pruebas
+\end{itemize}
+
+\subsection{Entorno de producción}
+Configuración para el entorno de producción:
+
+\begin{itemize}
+    \item Optimización de rendimiento
+    \item Logs de nivel INFO/WARN
+    \item Configuración de seguridad estricta
+    \item Backups automáticos de base de datos
+    \item Monitoreo avanzado
+\end{itemize}
+
+\section{Escalabilidad}
+La arquitectura de microservicios permite escalar la plataforma de varias maneras:
+
+\begin{itemize}
+    \item \textbf{Escalado horizontal}: Añadir más instancias de los servicios más utilizados
+    \item \textbf{Escalado vertical}: Aumentar los recursos asignados a cada servicio
+    \item \textbf{Sharding de base de datos}: Particionar datos para manejar mayor volumen
+    \item \textbf{Caché distribuida}: Implementar Redis para mejorar el rendimiento
+\end{itemize}
+
+\section{Monitoreo y mantenimiento}
+\subsection{Herramientas de monitoreo}
+Para monitorear la plataforma en producción se utilizan:
+
+\begin{itemize}
+    \item \textbf{Zipkin}: Para trazabilidad distribuida
+    \item \textbf{Spring Boot Actuator}: Para métricas de servicios
+    \item \textbf{Prometheus}: Para recopilación y almacenamiento de métricas
+    \item \textbf{Grafana}: Para visualización de métricas y alertas
+\end{itemize}
+
+\subsection{Estrategias de respaldo}
+Estrategias recomendadas para respaldo de datos:
+
+\begin{itemize}
+    \item Respaldos diarios incrementales de bases de datos
+    \item Respaldos semanales completos
+    \item Almacenamiento de respaldos en ubicaciones geográficamente distribuidas
+    \item Pruebas periódicas de restauración
+\end{itemize}
+
+\chapter{Casos de Uso}
+\section{Estudiantes}
+\subsection{Acceso a clases y materiales}
+Los estudiantes pueden acceder a sus clases y materiales de estudio:
+
+\begin{enumerate}
+    \item Iniciar sesión con credenciales de estudiante
+    \item Ver el dashboard con las clases asignadas
+    \item Seleccionar una clase para ver sus detalles
+    \item Acceder a los materiales de estudio y recursos
+    \item Descargar documentos y archivos compartidos
+\end{enumerate}
+
+\subsection{Realización de actividades}
+El proceso para realizar actividades asignadas:
+
+\begin{enumerate}
+    \item Ver la lista de actividades pendientes en el dashboard
+    \item Seleccionar una actividad para ver sus detalles
+    \item Leer las instrucciones y requisitos
+    \item Completar la actividad en la plataforma o descargar plantillas
+    \item Subir archivos si es necesario
+    \item Enviar la respuesta antes de la fecha límite
+    \item Recibir confirmación de envío exitoso
+\end{enumerate}
+
+\subsection{Revisión de calificaciones}
+Los estudiantes pueden revisar sus calificaciones:
+
+\begin{enumerate}
+    \item Acceder a la sección de actividades o calificaciones
+    \item Ver el listado de actividades con sus estados (pendiente, enviada, calificada)
+    \item Seleccionar una actividad calificada para ver detalles
+    \item Revisar la calificación y retroalimentación del profesor
+    \item Ver estadísticas de rendimiento general
+\end{enumerate}
+
+\section{Profesores}
+\subsection{Gestión de aulas}
+Los profesores pueden gestionar sus aulas virtuales:
+
+\begin{enumerate}
+    \item Crear nuevas aulas con nombre, descripción y categoría
+    \item Añadir estudiantes a las aulas
+    \item Organizar materiales y recursos
+    \item Modificar la configuración del aula
+    \item Archivar aulas de semestres anteriores
+\end{enumerate}
+
+\subsection{Creación de actividades}
+El proceso para crear y asignar actividades:
+
+\begin{enumerate}
+    \item Acceder a la sección de actividades
+    \item Crear una nueva actividad con título, descripción e instrucciones
+    \item Establecer fecha límite y parámetros de evaluación
+    \item Adjuntar archivos o recursos necesarios
+    \item Asignar la actividad a una o varias aulas
+    \item Publicar la actividad para que sea visible a los estudiantes
+\end{enumerate}
+
+\subsection{Calificación de respuestas}
+Los profesores pueden calificar las respuestas de los estudiantes:
+
+\begin{enumerate}
+    \item Acceder a la sección de respuestas pendientes
+    \item Ver listado de respuestas por actividad o por aula
+    \item Seleccionar una respuesta para revisarla
+    \item Descargar y revisar archivos adjuntos
+    \item Asignar una calificación
+    \item Proporcionar retroalimentación escrita
+    \item Guardar la calificación para que sea visible al estudiante
+\end{enumerate}
+
+\section{Administradores}
+\subsection{Gestión de usuarios}
+Los administradores pueden gestionar usuarios de la plataforma:
+
+\begin{enumerate}
+    \item Crear nuevos usuarios (estudiantes, profesores, administradores)
+    \item Asignar roles y permisos
+    \item Modificar información de usuarios existentes
+    \item Desactivar cuentas temporalmente
+    \item Restablecer contraseñas
+\end{enumerate}
+
+\subsection{Configuración del sistema}
+Opciones de configuración disponibles para administradores:
+
+\begin{enumerate}
+    \item Configurar parámetros globales del sistema
+    \item Definir categorías de aulas y actividades
+    \item Establecer políticas de seguridad
+    \item Configurar periodos académicos
+    \item Personalizar la apariencia de la plataforma
+\end{enumerate}
+
+\chapter{Conclusiones y Trabajo Futuro}
+\section{Resumen del proyecto}
+La plataforma educativa OsRoom representa una solución moderna y completa para la gestión educativa, implementada con tecnologías de vanguardia:
+
+\begin{itemize}
+    \item \textbf{Frontend}: Desarrollado con Next.js, TypeScript y Tailwind CSS, proporciona una interfaz intuitiva y responsive para estudiantes y profesores.
+    \item \textbf{Backend}: Implementado con una arquitectura de microservicios basada en Spring Boot y Spring Cloud, ofrece escalabilidad, mantenibilidad y resiliencia.
+    \item \textbf{Seguridad}: Implementa autenticación y autorización robustas mediante Keycloak y JWT.
+    \item \textbf{Infraestructura}: Utiliza Docker y Docker Compose para facilitar el despliegue y la escalabilidad.
+\end{itemize}
+
+La plataforma permite la gestión integral de aulas virtuales, actividades académicas, estudiantes y profesores, facilitando la educación en entornos presenciales, híbridos y remotos.
+
+\section{Beneficios clave}
+Los principales beneficios de la plataforma son:
+
+\begin{itemize}
+    \item \textbf{Experiencia de usuario mejorada}: Interfaz moderna e intuitiva que facilita la navegación y uso.
+    \item \textbf{Escalabilidad}: Capacidad para crecer con la demanda gracias a la arquitectura de microservicios.
+    \item \textbf{Flexibilidad}: Adaptable a diferentes contextos educativos y metodologías.
+    \item \textbf{Seguridad}: Protección robusta de datos y accesos mediante múltiples capas de seguridad.
+    \item \textbf{Mantenibilidad}: Arquitectura modular que facilita el mantenimiento y la evolución.
+\end{itemize}
+
+\section{Limitaciones actuales}
+A pesar de sus fortalezas, la plataforma tiene algunas limitaciones:
+
+\begin{itemize}
+    \item \textbf{Funcionalidad offline limitada}: Requiere conexión a internet para la mayoría de las funciones.
+    \item \textbf{Complejidad de despliegue}: La arquitectura de microservicios puede resultar compleja para instituciones pequeñas.
+    \item \textbf{Curva de aprendizaje}: Usuarios sin experiencia pueden requerir capacitación inicial.
+    \item \textbf{Integración con sistemas legacy}: Puede requerir desarrollo adicional para integración con sistemas existentes.
+\end{itemize}
+
+\section{Trabajo futuro}
+Se han identificado varias áreas para el desarrollo futuro de la plataforma:
+
+\begin{itemize}
+    \item \textbf{Análisis de aprendizaje}: Implementación de herramientas avanzadas de analítica para seguimiento de progreso.
+    \item \textbf{Aprendizaje adaptativo}: Contenido personalizado basado en el progreso y necesidades individuales.
+    \item \textbf{Soporte para videoconferencias integrado}: Implementación de funcionalidades de reuniones virtuales sin necesidad de herramientas externas.
+    \item \textbf{Aplicaciones móviles nativas}: Desarrollo de aplicaciones para iOS y Android.
+    \item \textbf{Soporte para internacionalización}: Ampliación del soporte para múltiples idiomas y regiones.
+    \item \textbf{Integración con LMS populares}: Conectores para sistemas como Moodle, Canvas o Blackboard.
+\end{itemize}
+
+\section{Recomendaciones}
+Basado en la experiencia de desarrollo, se ofrecen las siguientes recomendaciones:
+
+\begin{itemize}
+    \item \textbf{Implementación gradual}: Adoptar la plataforma en fases, comenzando con funcionalidades básicas.
+    \item \textbf{Capacitación de usuarios}: Invertir en formación para usuarios finales y personal técnico.
+    \item \textbf{Monitoreo continuo}: Implementar herramientas de observabilidad desde el inicio.
+    \item \textbf{Optimización de rendimiento}: Realizar pruebas de carga periódicas para identificar y resolver cuellos de botella.
+    \item \textbf{Retroalimentación de usuarios}: Establecer canales para recoger y actuar sobre la retroalimentación de los usuarios.
+\end{itemize}
+
+\section{Conclusión final}
+La plataforma educativa OsRoom representa una solución moderna, escalable y flexible para las necesidades educativas actuales. Su arquitectura de microservicios y su frontend moderno proporcionan una base sólida para el crecimiento y la evolución futura, adaptándose a las cambiantes necesidades del sector educativo.
+
+La combinación de tecnologías de vanguardia con un diseño centrado en el usuario hace de OsRoom una herramienta valiosa para instituciones educativas que buscan digitalizar y mejorar sus procesos de enseñanza y aprendizaje.
+
+\begin{center}
+    \textbf{--- Fin de la documentación ---}
+\end{center}
+
+\backmatter
+\appendix
+\chapter{Glosario de términos}
+\begin{itemize}
+    \item \textbf{API Gateway}: Punto único de entrada para todas las solicitudes de los clientes a los microservicios.
+    \item \textbf{Circuit Breaker}: Patrón de diseño que previene fallos en cascada en sistemas distribuidos.
+    \item \textbf{Config Server}: Servidor centralizado de configuración para todos los microservicios.
+    \item \textbf{Discovery Server}: Servicio que permite el registro y descubrimiento dinámico de microservicios.
+    \item \textbf{JWT (JSON Web Token)}: Estándar para crear tokens de acceso que permiten la propagación de identidad y privilegios.
+    \item \textbf{Keycloak}: Solución de gestión de identidad y acceso de código abierto.
+    \item \textbf{Microservicio}: Enfoque arquitectónico que estructura una aplicación como una colección de servicios pequeños y autónomos.
+    \item \textbf{NAP}: Niveles de Aprendizaje y Progreso, metodología para evaluar competencias académicas.
+    \item \textbf{OAuth2}: Protocolo de autorización que permite a aplicaciones de terceros acceder a recursos de un servicio.
+    \item \textbf{OpenFeign}: Cliente HTTP declarativo utilizado para la comunicación entre microservicios.
+    \item \textbf{Spring Boot}: Framework para crear aplicaciones Java basadas en Spring con configuración mínima.
+    \item \textbf{Spring Cloud}: Conjunto de herramientas para desarrollar sistemas distribuidos en la nube.
+    \item \textbf{Tailwind CSS}: Framework CSS utilitario para crear diseños personalizados sin salir del HTML.
+    \item \textbf{Zipkin}: Sistema de trazabilidad distribuida para aplicaciones basadas en microservicios.
+\end{itemize}
+
+\chapter{Referencias bibliográficas}
+\begin{enumerate}
+    \item Spring Boot Documentation, \url{https://docs.spring.io/spring-boot/docs/current/reference/html/}
+    \item Spring Cloud Documentation, \url{https://docs.spring.io/spring-cloud/docs/current/reference/html/}
+    \item Next.js Documentation, \url{https://nextjs.org/docs}
+    \item Microservices Patterns, Chris Richardson, Manning Publications, 2018
+    \item Building Microservices, Sam Newman, O'Reilly Media, 2021
+    \item React Hooks Documentation, \url{https://reactjs.org/docs/hooks-intro.html}
+    \item Tailwind CSS Documentation, \url{https://tailwindcss.com/docs}
+    \item Docker Documentation, \url{https://docs.docker.com/}
+    \item Keycloak Documentation, \url{https://www.keycloak.org/documentation}
+    \item JWT Introduction, \url{https://jwt.io/introduction}
+\end{enumerate}
+
+\end{document} 

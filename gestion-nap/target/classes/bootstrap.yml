@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: gestion-nap
+  config:
+    import: optional:configserver:http://config-server:8888
+  cloud:
+    config:
+      enabled: true
+      uri: http://config-server:8888
+      fail-fast: true
+      retry:
+        max-attempts: 20
+        max-interval: 15000
+        initial-interval: 10000 

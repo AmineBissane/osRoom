@@ -1,0 +1,28 @@
+eureka:
+  instance:
+    hostname: osroom-discovery-1
+  client:
+    service-url:
+      defaultZone: http://osroom-discovery-1:8761/eureka
+
+
+server:
+  port: 8020
+spring:
+  application:
+    name: activitiesresponses
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://postgresql:5432/activitiesresponses
+    username: alibou
+    password: alibou
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0

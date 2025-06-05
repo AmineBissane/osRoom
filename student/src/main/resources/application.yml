@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: students
+  config:
+    import: optional:configserver:http://osroom-config-server-1:8888
