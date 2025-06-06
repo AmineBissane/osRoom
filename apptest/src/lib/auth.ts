@@ -24,6 +24,7 @@ export async function authenticateWithKeycloak(username: string, password: strin
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: formData.toString(),
+      credentials: 'include'
     }
   );
 
@@ -38,6 +39,11 @@ export async function authenticateWithKeycloak(username: string, password: strin
     tokenLength: tokenData.access_token?.length,
     tokenType: tokenData.token_type
   });
+
+  // Ensure the token is properly formatted
+  if (!tokenData.access_token.startsWith('Bearer ')) {
+    tokenData.access_token = `Bearer ${tokenData.access_token}`;
+  }
 
   return tokenData;
 }
@@ -58,6 +64,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: formData.toString(),
+      credentials: 'include'
     }
   );
 
@@ -73,5 +80,26 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
     tokenType: tokenData.token_type
   });
 
+  // Ensure the token is properly formatted
+  if (!tokenData.access_token.startsWith('Bearer ')) {
+    tokenData.access_token = `Bearer ${tokenData.access_token}`;
+  }
+
   return tokenData;
+}
+
+export function isTokenValid(token: string | undefined): boolean {
+  if (!token) return false;
+  
+  try {
+    // Basic check if token exists and has a reasonable length
+    if (token.length < 20) return false;
+    
+    // For a more thorough check, you could decode the JWT and check its expiration
+    // This is a simplified check
+    return true;
+  } catch (error) {
+    console.error('Error validating token:', error);
+    return false;
+  }
 } 

@@ -20,6 +20,16 @@ export default function LoginPage() {
     password: ""
   })
 
+  // Check if already logged in
+  useEffect(() => {
+    const accessToken = Cookies.get('access_token')
+    if (accessToken) {
+      const fromPath = searchParams.get('from')
+      const redirectPath = fromPath || '/'
+      window.location.href = redirectPath
+    }
+  }, [searchParams])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -34,19 +44,30 @@ export default function LoginPage() {
         firstChars: tokens.access_token.substring(0, 20)
       })
       
-      // Store tokens in cookies
-      Cookies.set('access_token', tokens.access_token, { secure: true, sameSite: 'lax' })
-      Cookies.set('refresh_token', tokens.refresh_token, { secure: true, sameSite: 'lax' })
-      Cookies.set('id_token', tokens.id_token, { secure: true, sameSite: 'lax' })
+      // Store tokens in cookies with proper settings for middleware access
+      // Remove secure:true for development environment
+      document.cookie = `access_token=${tokens.access_token}; path=/; sameSite=lax; max-age=3600`
+      document.cookie = `refresh_token=${tokens.refresh_token}; path=/; sameSite=lax; max-age=86400`
+      document.cookie = `id_token=${tokens.id_token}; path=/; sameSite=lax; max-age=3600`
       
-      toast.success("Login successful")
-
-      // Get the redirect destination from the URL params or default to home
-      const fromPath = searchParams.get('from')
-      const redirectPath = fromPath || '/'
+      // Also set with js-cookie as backup
+      Cookies.set('access_token', tokens.access_token, { path: '/', sameSite: 'lax' })
+      Cookies.set('refresh_token', tokens.refresh_token, { path: '/', sameSite: 'lax' })
+      Cookies.set('id_token', tokens.id_token, { path: '/', sameSite: 'lax' })
       
-      // Do a full page refresh to the redirect path
-      window.location.href = redirectPath
+      // Add a small delay to ensure cookies are set before redirect
+      setTimeout(() => {
+        toast.success("Login successful")
+  
+        // Get the redirect destination from the URL params or default to home
+        const fromPath = searchParams.get('from')
+        const redirectPath = fromPath || '/'
+        
+        console.log('Redirecting to:', redirectPath)
+        
+        // Do a full page refresh to the redirect path
+        window.location.href = redirectPath
+      }, 500)
     } catch (error) {
       console.error("Login error:", error)
       toast.error(error instanceof Error ? error.message : "Invalid username or password")
