@@ -95,138 +95,42 @@ const decodeJwt = (token: string) => {
   }
 };
 
-// Input para la calificación con mejor manejo de eventos
-const GradeInput = React.memo(({ 
+// GradeInput component for grading
+const GradeInput = ({ 
   value, 
   onChange, 
   onSave, 
   disabled 
 }: { 
-  value: string, 
-  onChange: (value: string) => void, 
-  onSave: () => void, 
-  disabled: boolean 
+  value: string; 
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
+  onSave: () => void; 
+  disabled: boolean;
 }) => {
-  // Referencia para el input
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Manejador local para capturar el cambio sin propagar eventos
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onChange(e.target.value);
-  }, [onChange]);
-  
-  // Manejador para la tecla Enter que guarda directamente
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    // Si presiona Enter, guardar la calificación
-    if (e.key === 'Enter' && !disabled && !isProcessing) {
-      e.preventDefault();
-      console.log('Enter key pressed, saving grade');
-      
-      try {
-        onSave();
-      } catch (error) {
-        console.error('Error al guardar calificación:', error);
-      }
-      
-      // Asegurar que el loader no quede activo permanentemente
-      setTimeout(() => {
-        console.log('Resetting processing state after timeout');
-        setIsProcessing(false);
-      }, 2000); // Timeout de seguridad de 2 segundos
-    }
-  }, [disabled, onSave, isProcessing]);
-  
-  // Manejador del botón de guardar
-  const handleSaveClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isProcessing) {
-      console.log('Ya está procesando, ignorando clic');
-      return;
-    }
-    
-    console.log('Save button clicked, setting processing state');
-    setIsProcessing(true);
-    
-    try {
-      onSave();
-    } catch (error) {
-      console.error('Error al guardar calificación:', error);
-    }
-    
-    // Asegurar que el loader no quede activo permanentemente
-    setTimeout(() => {
-      console.log('Resetting processing state after timeout');
-      setIsProcessing(false);
-    }, 2000); // Timeout de seguridad de 2 segundos
-  }, [onSave, isProcessing]);
-  
-  // Enfoca el input cuando se monta el componente
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
-  
-  // Efecto para resetear el estado de procesamiento cuando cambia el estado disabled externo
-  useEffect(() => {
-    if (disabled) {
-      console.log('Setting processing state false due to disabled prop');
-      setIsProcessing(false);
-    }
-  }, [disabled]);
-  
-  // Efecto para limpiar el estado de procesamiento al desmontar
-  useEffect(() => {
-    return () => {
-      console.log('Cleaning up processing state on unmount');
-      setIsProcessing(false);
-    };
-  }, []);
-  
   return (
-    <div 
-      className="flex items-center gap-2" 
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <Input 
-        ref={inputRef}
-        type="number" 
-        min="0" 
-        max="10" 
-        step="0.1"
-        placeholder="Calificación (0-10)" 
+    <div className="flex items-center gap-2">
+      <Input
+        type="number"
+        placeholder="Calificación (0-10)"
         value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        className="w-full"
-        disabled={disabled || isProcessing}
+        onChange={onChange}
+        disabled={disabled}
+        min="0"
+        max="10"
+        step="0.1"
+        className="flex-1"
       />
       <Button 
-        size="sm"
-        onClick={handleSaveClick}
-        disabled={disabled || isProcessing}
-        type="button"
-        title="Guardar calificación"
-        aria-label="Guardar calificación"
+        variant="default" 
+        onClick={onSave}
+        disabled={disabled}
       >
-        {disabled || isProcessing ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Save className="h-4 w-4" />
-        )}
+        <Save className="h-4 w-4 mr-2" />
+        Guardar
       </Button>
     </div>
   );
-});
-
-GradeInput.displayName = 'GradeInput';
+};
 
 // Componente envolvente para evitar recargas
 const StableContainer = React.memo(({ children }: { children: React.ReactNode }) => {
@@ -437,8 +341,28 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (activityId && !initializing) {
       console.log("Fetching activity with ID:", activityId);
-      fetchActivity();
-      checkUserSubmission(activityId);
+      
+      // Create a function to fetch both activity and user submission data
+      const fetchData = async () => {
+        try {
+          setIsLoading(true);
+          
+          // Fetch activity data
+          await fetchActivity();
+          
+          // Check user submission
+          await checkUserSubmission(activityId);
+          
+          // Ensure loading state is set to false when everything is done
+          setIsLoading(false);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          setIsLoading(false);
+          setError("Error al cargar los datos de la actividad");
+        }
+      };
+      
+      fetchData();
     }
   }, [activityId, initializing]);
 
@@ -449,8 +373,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      setIsLoading(true);
-      
       console.log('Fetching activity details for ID:', activityId);
       
       // Add cache-busting timestamp
@@ -476,7 +398,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         } else {
           setError(`Error al cargar la actividad: ${response.status}`);
         }
-        setIsLoading(false);
         return;
       }
       
@@ -495,13 +416,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (formattedActivity.endDate && new Date() > formattedActivity.endDate) {
         setIsExpired(true);
       }
-      
-      // Set loading to false
-      setIsLoading(false);
     } catch (error) {
       console.error('Error fetching activity:', error);
-      setError('Error al cargar la actividad');
-      setIsLoading(false);
+      throw error; // Propagate the error to be handled by the parent function
     }
   };
 
@@ -878,6 +795,302 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           )}
         </div>
       </div>
+    );
+  };
+
+  // Function to fetch all responses for an activity (for teachers)
+  const fetchAllResponses = async () => {
+    if (!activityId) return;
+    
+    setLoadingResponses(true);
+    
+    try {
+      // Add cache-busting timestamp
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/proxy/activitiesresponses/activity/${activityId}?_=${timestamp}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching responses: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Responses data:', data);
+      setResponses(data);
+    } catch (error) {
+      console.error('Error fetching responses:', error);
+      toast.error('Error al cargar las respuestas');
+    } finally {
+      setLoadingResponses(false);
+    }
+  };
+
+  // Function to handle viewing all responses (for teachers)
+  const handleViewResponses = () => {
+    setViewResponses(true);
+    fetchAllResponses();
+  };
+
+  // Function to view a specific response detail
+  const handleViewResponseDetail = (response: ActivityResponse) => {
+    setSelectedResponse(response);
+    setIsGrading(true);
+    
+    // If the response already has a grade, pre-fill the input
+    if (response.grade !== undefined && response.grade !== null) {
+      setGradeInput(response.grade.toString());
+    } else {
+      setGradeInput("");
+    }
+  };
+
+  // Function to handle grade input change
+  const handleGradeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Only allow numbers between 0 and 10
+    if (value === '' || (/^\d+(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 10)) {
+      setGradeInput(value);
+    }
+  };
+
+  // Function to save a grade for a response
+  const saveGrade = async () => {
+    if (!selectedResponse) return;
+    
+    try {
+      // Add validation
+      const gradeValue = parseFloat(gradeInput);
+      if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 10) {
+        toast.error('La calificación debe ser un número entre 0 y 10');
+        return;
+      }
+      
+      // Get user info from token
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('access_token='))
+        ?.split('=')[1];
+        
+      if (!token) {
+        throw new Error('No se encontró el token de autenticación');
+      }
+      
+      // Decode token to get grader info
+      const decodedToken = decodeJwt(token);
+      if (!decodedToken) {
+        throw new Error('No se pudo decodificar el token');
+      }
+      
+      const graderId = decodedToken.sub || '';
+      const graderName = decodedToken.name || decodedToken.preferred_username || 'Unknown User';
+      
+      // Create payload for grade update
+      const payload = {
+        id: selectedResponse.id,
+        grade: gradeValue,
+        gradedBy: graderName,
+        gradedAt: new Date().toISOString()
+      };
+      
+      // Save the grade via API
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/proxy/activitiesresponses/${selectedResponse.id}?_=${timestamp}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error saving grade: ${response.status}`);
+      }
+      
+      toast.success('Calificación guardada correctamente');
+      
+      // Update local state
+      const updatedResponse = {
+        ...selectedResponse,
+        grade: gradeValue,
+        gradedBy: graderName,
+        gradedAt: new Date().toISOString()
+      };
+      
+      setSelectedResponse(updatedResponse);
+      
+      // Update in the responses list
+      setResponses(responses.map(r => 
+        r.id === selectedResponse.id ? updatedResponse : r
+      ));
+      
+      // Close the grading dialog after a short delay
+      setTimeout(() => {
+        setIsGrading(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error al guardar la calificación:', error);
+      toast.error(`Error al guardar la calificación: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Function to get a file URL for download or preview
+  const getFileUrl = (fileId: string | undefined): string => {
+    if (!fileId) return '';
+    return `/api/proxy/file-storage/download/${fileId}`;
+  };
+
+  // Format date and time for display
+  const formatDateTime = (dateString: string | undefined): string => {
+    if (!dateString) return 'No disponible';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return dateString;
+    }
+  };
+
+  // DocumentPreview component to preview files
+  const DocumentPreview = ({ fileId, hideButtons = false }: { fileId: string | undefined, hideButtons?: boolean }) => {
+    const [previewUrl, setPreviewUrl] = useState<string>('');
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+    
+    useEffect(() => {
+      const loadPreview = async () => {
+        try {
+          setLoading(true);
+          if (!fileId) {
+            throw new Error('No file ID provided');
+          }
+          // For preview, we'll use our proxy endpoint
+          const url = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          setPreviewUrl(url);
+        } catch (err) {
+          console.error('Error loading preview:', err);
+          setError('No se pudo cargar la vista previa');
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      if (fileId) {
+        loadPreview();
+      } else {
+        setError('No se proporcionó un ID de archivo');
+        setLoading(false);
+      }
+    }, [fileId]);
+    
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+        </div>
+      );
+    }
+    
+    if (error || !fileId) {
+      return (
+        <div className="p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md">
+          <p>{error || 'No hay archivo disponible'}</p>
+          {!hideButtons && fileId && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => downloadFile(fileId)}
+              className="mt-2"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar archivo
+            </Button>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-2">
+        {!hideButtons && (
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              Vista previa del archivo
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => downloadFile(fileId)}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar
+            </Button>
+          </div>
+        )}
+        <div className="border rounded-md overflow-hidden">
+          <iframe 
+            src={previewUrl} 
+            className="w-full h-[400px]" 
+            title="Vista previa" 
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Response card component to display in the list
+  const ResponseCard = ({ response, onViewDetails }: { 
+    response: ActivityResponse, 
+    onViewDetails: (response: ActivityResponse) => void 
+  }) => {
+    return (
+      <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
+        <CardContent className="p-0">
+          <div className="p-4 border-b">
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="font-medium truncate">{response.studentName}</h3>
+              {response.grade !== undefined && response.grade !== null ? (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  {response.grade}/10
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                  Pendiente
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Enviado: {response.createdAt ? formatDateTime(response.createdAt) : 'No disponible'}
+            </p>
+          </div>
+          <div className="p-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full"
+              onClick={() => onViewDetails(response)}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Ver Detalles
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   };
 
@@ -1333,7 +1546,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                         onClick={() => {
                           const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
                           if (fileId) {
-                            window.open(getFileUrl(fileId, true), '_blank');
+                            window.open(getFileUrl(fileId), '_blank');
                           }
                         }}
                       >
@@ -1344,7 +1557,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                       <Button 
                         variant="outline"
                         className="w-full sm:w-auto"
-                        onClick={() => downloadFile(selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL)}
+                        onClick={() => {
+                          const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
+                          if (fileId) {
+                            downloadFile(fileId);
+                          }
+                        }}
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Descargar archivo
@@ -1353,10 +1571,16 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                     
                     {/* Mostrar la previsualización */}
                     <div className="border rounded-md overflow-hidden h-[400px]">
-                      <DocumentPreview 
-                        fileId={selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL}
-                        hideButtons={true}
-                      />
+                      {selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL ? (
+                        <DocumentPreview 
+                          fileId={selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL}
+                          hideButtons={true}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <p className="text-muted-foreground">No hay archivo disponible para previsualizar</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
