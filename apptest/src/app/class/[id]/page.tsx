@@ -332,20 +332,13 @@ export default function ClassPage({ params }: { params: { id: string } }) {
   // Function to check if user has already submitted a response to an activity
   const checkUserSubmission = async (activityId: string | number) => {
     try {
-      console.log('Verificando si el usuario ya ha enviado una respuesta para la actividad:', activityId);
-      
-      // Obtener el token
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_token='))
-        ?.split('=')[1];
-        
+      const token = Cookies.get('access_token');
       if (!token) {
-        console.error('No se encontró token al verificar el estado de entrega');
+        console.error('No token found');
         return false;
       }
       
-      // Decodificar el token para obtener el ID del usuario
+      // Get user ID from token
       const decodedToken = decodeJwt(token);
       if (!decodedToken || !decodedToken.sub) {
         console.error('No se pudo obtener el ID de usuario del token');
@@ -355,10 +348,9 @@ export default function ClassPage({ params }: { params: { id: string } }) {
       const userId = decodedToken.sub;
       console.log('Verificando entregas para el usuario:', userId);
       
-      // Consultar directamente al backend
-      const response = await fetch(`http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`, {
+      // Use our proxy API endpoint
+      const response = await fetch(`/api/proxy/activitiesresponses/activity/${activityId}/user/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
@@ -595,111 +587,71 @@ export default function ClassPage({ params }: { params: { id: string } }) {
       // Si no se detecta por fileId, intentar obtener metadatos
       const fetchFileInfo = async () => {
         try {
-          // Get the token
-          const token = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('access_token='))
-            ?.split('=')[1];
-            
-          if (!token) {
-            console.error('No se encontró token de autenticación');
-            return;
-          }
+          setIsLoading(true);
+          setError(null);
           
-          console.log(`Intentando obtener metadatos para el archivo: ${fileId}`);
-          
-          // First, try to get metadata directly
-          try {
-            const metadataResponse = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (metadataResponse.ok) {
-              const metadata = await metadataResponse.json();
-              console.log('Metadatos obtenidos:', metadata);
-              
-              if (metadata && metadata.name) {
-                setFileName(metadata.name);
-                
-                if (isNonViewableExtension(metadata.name)) {
-                  console.log(`Archivo no visualizable detectado: ${metadata.name}`);
-                  setFileType(getFileTypeFromName(metadata.name));
-                  setIsNonViewableFile(true);
-                  setIsLoading(false);
-                  return;
-                }
-              }
-            } else {
-              console.warn(`No se pudieron obtener metadatos. Estado: ${metadataResponse.status}`);
+          // First, try to get metadata about the file
+          const metadataResponse = await fetch(`/api/proxy/file-storage/${fileId}/metadata`, {
+            headers: {
+              'Accept': 'application/json'
             }
-          } catch (metadataError) {
-            console.error('Error al obtener metadatos:', metadataError);
+          });
+          
+          if (!metadataResponse.ok) {
+            throw new Error(`Failed to fetch file metadata: ${metadataResponse.status}`);
           }
           
-          // Si no hay metadatos, intentar hacer HEAD al archivo para verificar el tipo MIME
-          try {
-            const headResponse = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/${fileId}?preview=true`, {
-              method: 'HEAD',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
+          const metadata = await metadataResponse.json();
+          console.log('File metadata:', metadata);
+          
+          // Set file name and type from metadata
+          if (metadata.name) {
+            setFileName(metadata.name);
             
-            if (headResponse.ok) {
-              const contentType = headResponse.headers.get('content-type');
-              const contentDisposition = headResponse.headers.get('content-disposition');
-              
-              console.log('Content-Type:', contentType);
-              console.log('Content-Disposition:', contentDisposition);
-              
-              // Obtener nombre de archivo de Content-Disposition si está disponible
-              if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-                if (filenameMatch && filenameMatch[1]) {
-                  const extractedName = filenameMatch[1];
-                  setFileName(extractedName);
-                  
-                  if (isNonViewableExtension(extractedName)) {
-                    console.log(`Archivo no visualizable detectado desde content-disposition: ${extractedName}`);
-                    setFileType(getFileTypeFromName(extractedName));
-                    setIsNonViewableFile(true);
-                    setIsLoading(false);
-                    return;
-                  }
-                }
+            // Detect file type from extension
+            const extension = metadata.name.toLowerCase().split('.').pop();
+            if (extension) {
+              if (['pdf'].includes(extension)) {
+                setFileType('PDF');
+              } else if (['doc', 'docx'].includes(extension)) {
+                setFileType('Word');
+              } else if (['xls', 'xlsx'].includes(extension)) {
+                setFileType('Excel');
+              } else if (['ppt', 'pptx'].includes(extension)) {
+                setFileType('PowerPoint');
+              } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+                setFileType('imagen');
+              } else if (['txt', 'md'].includes(extension)) {
+                setFileType('texto');
+              } else {
+                setFileType(`archivo ${extension}`);
               }
               
-              // Verificar el tipo MIME
-              if (contentType) {
-                const nonViewableMimeTypes = [
-                  'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
-                  'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
-                  'application/java-archive'
-                ];
-                
-                if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
-                  console.log(`Archivo no visualizable detectado por MIME type: ${contentType}`);
-                  // Usar el nombre de archivo del fileId si no tenemos uno mejor
-                  if (!fileName) {
-                    const inferredName = fileId.split('/').pop() || 'archivo';
-                    setFileName(inferredName);
-                    setFileType(contentType.split('/').pop() || 'archivo');
-                  }
-                  setIsNonViewableFile(true);
-                  setIsLoading(false);
-                  return;
-                }
+              // Check if this is a non-viewable file type
+              if (nonViewableExtensions.some(ext => metadata.name.toLowerCase().endsWith(ext))) {
+                setIsNonViewableFile(true);
+                setIsLoading(false);
+                return;
               }
             }
-          } catch (headError) {
-            console.error('Error al verificar cabeceras del archivo:', headError);
           }
+          
+          // Now check if we can preview the file
+          const headResponse = await fetch(`/api/proxy/file-storage/${fileId}?preview=true`, {
+            method: 'HEAD'
+          });
+          
+          if (!headResponse.ok) {
+            throw new Error(`File preview not available: ${headResponse.status}`);
+          }
+          
+          // If we got here, file should be viewable
+          setIsLoading(false);
           
         } catch (error) {
-          console.error('Error general al verificar el archivo:', error);
+          console.error('Error fetching file info:', error);
+          setError(error instanceof Error ? error.message : 'Error loading file preview');
+          setIsLoading(false);
         }
       };
       

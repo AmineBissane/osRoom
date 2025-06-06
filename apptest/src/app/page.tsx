@@ -291,43 +291,29 @@ export default function Home() {
 
   const handleDownloadFile = async (fileId: string, fileName: string) => {
     try {
-      const token = Cookies.get('access_token')
-      if (!token) {
-        router.replace('/login')
-        return
-      }
-
-      // Use direct backend call instead of proxy API endpoint
-      const response = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
+      // Use our proxy API endpoint
+      const response = await fetch(`/api/proxy/file-storage/download/${fileId}`, {
+        method: 'GET'
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          Cookies.remove('access_token')
-          Cookies.remove('refresh_token')
-          Cookies.remove('id_token')
-          router.replace('/login')
-          return
-        }
-        throw new Error('Failed to download file')
+        throw new Error('Failed to download file');
       }
 
+      // Get the blob from the response
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
       
-      toast.success('File downloaded successfully');
+      // Create a download link and click it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading file:', error);
       toast.error('Error downloading file');
