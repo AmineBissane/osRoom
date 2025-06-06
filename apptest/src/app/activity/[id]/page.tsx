@@ -526,47 +526,46 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       const timestamp = new Date().getTime();
       const cacheBustingUrl = `${userUrl}?_=${timestamp}`;
       
-      try {
-        const userResponse = await fetch(cacheBustingUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        });
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          console.log('Respuesta del endpoint de usuario:', userData);
-          
-          // Si hay alguna respuesta, el usuario ya ha enviado
-          const hasSubmitted = Array.isArray(userData) && userData.length > 0;
-          
-          if (hasSubmitted) {
-            console.log('El usuario ya ha enviado una respuesta');
-            
-            // Actualizar estado global y mensaje
-            setUserHasSubmitted(true);
-            
-            // Si hay una respuesta con calificación, guardarla en el estado
-            if (userData.length > 0 && userData[0].grade !== undefined) {
-              setSubmittedResponse(userData[0]);
-            }
-            
-            // Guardar en localStorage para persistencia
-            saveSubmissionState();
-            
-            return true;
-          }
-        } else {
-          console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
+      const userResponse = await fetch(cacheBustingUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
-      } catch (error) {
-        console.error('Error consultando las entregas del usuario:', error);
+      });
+      
+      if (!userResponse.ok) {
+        console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
+        return false;
       }
       
-      // Si llegamos aquí, no se encontraron respuestas
-      return false;
+      const userData = await userResponse.json();
+      console.log('Respuesta del endpoint de usuario:', userData);
+      
+      // Si hay alguna respuesta, el usuario ya ha enviado
+      const hasSubmitted = Array.isArray(userData) && userData.length > 0;
+      
+      if (hasSubmitted) {
+        console.log('El usuario ya ha enviado una respuesta');
+        
+        // Actualizar estado global y mensaje
+        setUserHasSubmitted(true);
+        
+        // Si hay una respuesta con calificación, guardarla en el estado
+        if (userData.length > 0 && userData[0].grade !== undefined) {
+          setSubmittedResponse(userData[0]);
+        }
+        
+        // Guardar en localStorage para persistencia
+        saveSubmissionState();
+        
+        return true;
+      } else {
+        // Explicitly set to false if no submissions found
+        console.log('El usuario no ha enviado ninguna respuesta');
+        setUserHasSubmitted(false);
+        return false;
+      }
     } catch (error) {
       console.error('Error al verificar entregas del usuario:', error);
       return false;
@@ -835,9 +834,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       console.log('Responses data:', data);
       setResponses(data);
     } catch (error) {
-      console.error('Error fetching responses:', error);
+      console.error('Error fetching all responses:', error);
       toast.error('Error al cargar las respuestas');
+      // Clear responses in case of error
+      setResponses([]);
     } finally {
+      // Always clear loading state
       setLoadingResponses(false);
     }
   };
@@ -1105,6 +1107,34 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       </Card>
     );
   };
+
+  // Safety mechanism to ensure loading state doesn't get stuck
+  useEffect(() => {
+    if (isLoading) {
+      // Set a timeout to clear loading state after 15 seconds if it's still loading
+      const safetyTimer = setTimeout(() => {
+        console.log('Safety timeout: clearing loading state after timeout');
+        setIsLoading(false);
+      }, 15000);
+      
+      // Clear the timeout when loading state changes or component unmounts
+      return () => clearTimeout(safetyTimer);
+    }
+  }, [isLoading]);
+
+  // Safety mechanism for loadingResponses state
+  useEffect(() => {
+    if (loadingResponses) {
+      // Set a timeout to clear loading state after 10 seconds if it's still loading
+      const safetyTimer = setTimeout(() => {
+        console.log('Safety timeout: clearing loadingResponses state after timeout');
+        setLoadingResponses(false);
+      }, 10000);
+      
+      // Clear the timeout when loading state changes or component unmounts
+      return () => clearTimeout(safetyTimer);
+    }
+  }, [loadingResponses]);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
