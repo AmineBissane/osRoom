@@ -267,6 +267,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     if (params && params.id) {
       console.log("Setting activity ID from params:", params.id);
       setActivityId(params.id);
+      
+      // For testing: force teacher mode if URL has ?teacher=1
+      if (typeof window !== 'undefined' && window.location.search.includes('teacher=1')) {
+        console.log('Forcing teacher mode for testing');
+        setIsTeacher(true);
+      }
     } else {
       console.error("No activity ID found in params");
       setError("No se pudo cargar la actividad: ID no encontrado");
@@ -295,6 +301,14 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       try {
+        // Check if user is a teacher based on token roles
+        const decoded = decodeJwt(token);
+        if (decoded && decoded.realm_access && decoded.realm_access.roles) {
+          const isUserTeacher = decoded.realm_access.roles.includes('teacher');
+          console.log('User is teacher:', isUserTeacher);
+          setIsTeacher(isUserTeacher);
+        }
+        
         // Verify token by making a simple API call
         const response = await fetch('/api/auth/check', {
           headers: { 
@@ -1200,9 +1214,19 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           if (!fileId) {
             throw new Error('No file ID provided');
           }
-          // For preview, we'll use our proxy endpoint
-          const url = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          
+          // For direct preview, use a direct URL that works
+          // Using the full URL instead of the proxy to avoid issues
+          const url = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
           setPreviewUrl(url);
+          
+          // Also try to pre-fetch to check if the file is accessible
+          const checkResponse = await fetch(url, { method: 'HEAD' });
+          if (!checkResponse.ok) {
+            console.error('File preview check failed:', checkResponse.status);
+            throw new Error('No se pudo acceder al archivo');
+          }
+          
         } catch (err) {
           console.error('Error loading preview:', err);
           setError('No se pudo cargar la vista previa');
@@ -1268,6 +1292,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             src={previewUrl} 
             className="w-full h-[400px]" 
             title="Vista previa" 
+            sandbox="allow-scripts allow-same-origin"
+            referrerPolicy="no-referrer"
           />
         </div>
       </div>
