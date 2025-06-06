@@ -1,134 +1,381 @@
-# osRoom - Educational Microservices Platform
+# osRoom - Plataforma Educativa basada en Microservicios
 
-![Project Architecture](diagram.png)
+## Descripción General
 
-## Overview
+osRoom es una plataforma educativa integral construida sobre una arquitectura de microservicios, diseñada para facilitar la gestión de aulas virtuales, actividades estudiantiles y la organización de recursos educativos. La plataforma aprovecha tecnologías modernas nativas de la nube para proporcionar una solución escalable, mantenible y resiliente para instituciones educativas. Implementa patrones de diseño avanzados y principios SOLID para garantizar la extensibilidad y la separación de responsabilidades en cada componente del sistema.
 
-osRoom is a comprehensive educational platform built on a microservices architecture, designed to facilitate classroom management, student activities, and educational resource organization. The platform leverages modern cloud-native technologies to provide a scalable, maintainable, and resilient solution for educational institutions.
+## Índice de Contenidos
 
-## Table of Contents
+- [Características Principales](#características-principales)
+- [Arquitectura Técnica](#arquitectura-técnica)
+- [Servicios Implementados](#servicios-implementados)
+- [Tecnologías Utilizadas](#tecnologías-utilizadas)
+- [Guía de Inicio](#guía-de-inicio)
+  - [Requisitos Previos](#requisitos-previos)
+  - [Instalación y Configuración](#instalación-y-configuración)
+  - [Variables de Entorno](#variables-de-entorno)
+- [Documentación de API](#documentación-de-api)
+- [Seguridad e Identidad](#seguridad-e-identidad)
+- [Monitorización y Observabilidad](#monitorización-y-observabilidad)
+- [Estrategia de Pruebas](#estrategia-de-pruebas)
+- [Gestión de Datos](#gestión-de-datos)
+- [Escalabilidad](#escalabilidad)
+- [Proceso de Desarrollo](#proceso-de-desarrollo)
+- [Resolución de Problemas](#resolución-de-problemas)
+- [Contribuciones](#contribuciones)
+- [Licencia](#licencia)
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Services](#services)
-- [Technologies](#technologies)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation and Setup](#installation-and-setup)
-- [API Documentation](#api-documentation)
-- [Security](#security)
-- [Monitoring and Observability](#monitoring-and-observability)
-- [Contributing](#contributing)
-- [License](#license)
+## Características Principales
 
-## Features
+- **Gestión de Aulas Virtuales**: Sistema avanzado para la creación y administración de aulas virtuales con capacidades de programación, asignación de estudiantes y gestión de recursos educativos.
+- **Administración de Estudiantes**: Sistema integral para la gestión de perfiles de estudiantes, inscripciones y seguimiento de actividades académicas con implementación de políticas de privacidad de datos.
+- **Administración Escolar**: Módulo completo para operaciones administrativas escolares, incluyendo gestión de personal, recursos e infraestructura virtual.
+- **Gestión de Actividades**: Motor de creación, asignación y evaluación de actividades educativas con capacidad para diferentes tipos de contenido interactivo y sistemas de calificación configurables.
+- **Comunicación en Tiempo Real**: Integración avanzada con LiveKit para videoconferencias y colaboración en tiempo real, implementando WebRTC con optimizaciones de latencia y calidad.
+- **Almacenamiento de Archivos**: Sistema distribuido y seguro para almacenamiento y gestión de recursos educativos, con políticas de retención y control de versiones.
+- **Autenticación y Autorización**: Control de acceso seguro mediante Keycloak, implementando OAuth2, OpenID Connect y gestión granular de roles y permisos.
+- **Configuración Centralizada**: Gestión dinámica de configuraciones mediante servidor de configuración Spring Cloud Config con soporte para perfiles por entorno.
+- **Descubrimiento de Servicios**: Registro y descubrimiento automático de servicios utilizando Netflix Eureka con balanceo de carga dinámico.
+- **API Gateway**: Punto de entrada único para todas las solicitudes de clientes implementando patrones de control de tráfico, circuit breaker y rate limiting.
 
-- **Classroom Management**: Create and manage virtual classrooms
-- **Student Management**: Manage student profiles, enrollments, and activities
-- **School Administration**: Handle school-related operations and data
-- **Activity Management**: Create, assign, and evaluate educational activities
-- **Real-time Communication**: Integrated with LiveKit for real-time video conferencing
-- **File Storage**: Secure file storage and management for educational resources
-- **Authentication & Authorization**: Secure access control with Keycloak
-- **Centralized Configuration**: Dynamic configuration management
-- **Service Discovery**: Automatic service registration and discovery
-- **API Gateway**: Single entry point for all client requests
+## Arquitectura Técnica
 
-## Architecture
+osRoom implementa una arquitectura de microservicios con los siguientes componentes y patrones de diseño:
 
-osRoom follows a microservices architecture pattern with the following key components:
+### Patrones Arquitectónicos Implementados
 
-- **API Gateway**: Serves as the single entry point for all client requests
-- **Config Server**: Centralizes configuration management
-- **Discovery Server**: Provides service registration and discovery
-- **Microservices**: Specialized services for specific business domains
+- **API Gateway**: Implementación del patrón API Gateway utilizando Spring Cloud Gateway con enrutamiento dinámico, filtros pre/post y capacidades de transformación de mensajes.
+- **Servidor de Configuración**: Centralización de configuraciones mediante Spring Cloud Config Server conectado a repositorio Git para control de versiones de configuración.
+- **Servidor de Descubrimiento**: Implementación del patrón Service Registry con Netflix Eureka para descubrimiento de servicios y resolución dinámica de endpoints.
+- **Microservicios Especializados**: Descomposición del dominio siguiendo principios de Domain-Driven Design (DDD) y Context Mapping para definir límites entre servicios.
+- **Comunicación Asíncrona**: Implementación de Event-Driven Architecture para comunicación entre servicios mediante mensajería asíncrona.
+- **CQRS**: Separación de operaciones de lectura y escritura en servicios críticos para optimización de rendimiento.
+- **Circuit Breaker**: Implementación de patrones de resiliencia con Resilience4j para manejar fallos de servicios y degradación controlada.
+- **Saga Pattern**: Implementación de transacciones distribuidas para operaciones complejas que involucran múltiples servicios.
 
-## Services
+### Capas de Implementación por Servicio
 
-| Service | Description | Port |
-|---------|-------------|------|
-| `gateway` | API Gateway service for routing requests | 8222 |
-| `config-server` | Centralized configuration management | 8888 |
-| `discovery` | Service discovery and registration | 8761 |
-| `gestion-nap` | Core management service | 8226 |
-| `student` | Student profile and management | 8090 |
-| `school` | School management and operations | 8070 |
-| `classrooms` | Classroom management | 8000 |
-| `activities` | Educational activities management | 8010 |
-| `activitiesresponses` | Student responses to activities | 8020 |
-| `file-storage` | Document and media file storage | 8030 |
+Cada microservicio implementa una arquitectura en capas:
 
-## Technologies
+1. **Capa de API**: Controladores REST y definición de contratos de API
+2. **Capa de Aplicación**: Orquestación de casos de uso e implementación de lógica de negocio
+3. **Capa de Dominio**: Modelos de dominio, reglas de negocio y lógica central
+4. **Capa de Infraestructura**: Implementaciones técnicas, persistencia y comunicación externa
+5. **Capa de Configuración**: Configuración técnica del servicio
 
-- **Backend**: Spring Boot, Spring Cloud
-- **Database**: PostgreSQL
-- **Security**: Keycloak for Identity and Access Management
-- **Service Communication**: Spring Cloud OpenFeign
-- **Monitoring**: Spring Boot Actuator
-- **Tracing**: Zipkin for distributed tracing
-- **Containerization**: Docker and Docker Compose
-- **Real-time Communication**: LiveKit
+## Servicios Implementados
 
-## Getting Started
+| Servicio | Descripción | Puerto | Dominio Funcional | Patrones Implementados |
+|---------|-------------|------|-------------------|------------------------|
+| `gateway` | Servicio Gateway API para enrutamiento de solicitudes | 8222 | Infraestructura | API Gateway, Load Balancing, Circuit Breaker |
+| `config-server` | Gestión centralizada de configuraciones | 8888 | Infraestructura | Externalización de Configuración |
+| `discovery` | Registro y descubrimiento de servicios | 8761 | Infraestructura | Service Registry, Service Discovery |
+| `gestion-nap` | Servicio central de gestión | 8226 | Core | CQRS, Event Sourcing |
+| `student` | Gestión de perfiles y administración de estudiantes | 8090 | Estudiantes | Repository, Specification |
+| `school` | Gestión escolar y operaciones | 8070 | Instituciones | Aggregate Root, Domain Services |
+| `classrooms` | Gestión de aulas virtuales | 8000 | Aulas | Factory, Builder |
+| `activities` | Gestión de actividades educativas | 8010 | Actividades | Strategy, Template Method |
+| `activitiesresponses` | Respuestas de estudiantes a actividades | 8020 | Actividades | Observer, Command |
+| `file-storage` | Almacenamiento de documentos y archivos multimedia | 8030 | Infraestructura | Proxy, Decorator |
 
-### Prerequisites
+## Tecnologías Utilizadas
 
-Ensure you have the following installed:
+### Backend
+- **Framework Principal**: Spring Boot 3.x, Spring Cloud 2023.x
+- **Persistencia**: Spring Data JPA, Hibernate ORM 6.x
+- **Comunicación entre Servicios**: Spring Cloud OpenFeign, Spring WebFlux
+- **Mensajería**: Spring Cloud Stream, Apache Kafka
+- **Cache**: Redis, Caffeine
 
-- Java Development Kit (JDK) 17 or later
+### Base de Datos
+- **Principal**: PostgreSQL 15.x con configuración de alta disponibilidad
+- **Cache**: Redis Cluster
+- **Monitoreo de DB**: PgAdmin, PgHero
+
+### Seguridad
+- **IAM**: Keycloak 24.x para gestión de identidades y acceso
+- **Implementación**: OAuth2 Resource Server, OpenID Connect
+- **Autorización**: Attribute-Based Access Control (ABAC)
+- **Cifrado**: AES-256, RSA-2048, HTTPS/TLS 1.3
+
+### Monitorización
+- **Métricas**: Spring Boot Actuator, Micrometer, Prometheus
+- **Logs**: ELK Stack (Elasticsearch, Logstash, Kibana)
+- **Trazabilidad**: Zipkin, Spring Cloud Sleuth
+- **Alertas**: Grafana Alertmanager
+
+### Contenedores y Orquestación
+- **Contenedorización**: Docker con imágenes optimizadas multi-etapa
+- **Composición**: Docker Compose para entornos de desarrollo
+- **Orquestación**: Kubernetes (opcional) para entornos de producción
+
+### Comunicación en Tiempo Real
+- **Videoconferencia**: LiveKit basado en WebRTC
+- **Mensajería**: WebSockets, STOMP
+
+## Guía de Inicio
+
+### Requisitos Previos
+
+Asegúrese de tener instalado lo siguiente:
+
+- Java Development Kit (JDK) 17 o posterior
 - Maven 3.8+
-- Docker and Docker Compose
+- Docker y Docker Compose
 - Git
+- NodeJS 18+ (para herramientas de desarrollo)
+- PostgreSQL Client (opcional, para acceso directo a la base de datos)
 
-### Installation and Setup
+### Instalación y Configuración
 
-1. Clone the repository:
+1. Clone el repositorio:
    ```bash
    git clone https://github.com/yourusername/osRoom.git
    cd osRoom
    ```
 
-2. Start the services using Docker Compose:
+2. Configure las variables de entorno necesarias (ver sección de Variables de Entorno)
+
+3. Inicie los servicios utilizando Docker Compose:
    ```bash
    docker-compose up -d
    ```
 
-3. Access the services:
-   - Discovery Server: http://localhost:8761
+4. Verifique el estado de los servicios:
+   ```bash
+   docker-compose ps
+   ```
+
+5. Acceda a los servicios:
+   - Servidor de Descubrimiento: http://localhost:8761
    - API Gateway: http://localhost:8222
-   - Keycloak Admin Console: http://localhost:8080
-   - PostgreSQL Admin: http://localhost:5050
+   - Consola de Administración de Keycloak: http://localhost:8080
+   - Administrador de PostgreSQL: http://localhost:5050
    - Zipkin: http://localhost:9411
 
-## API Documentation
+### Variables de Entorno
 
-API documentation is available through Swagger UI for each service at the `/swagger-ui.html` endpoint.
+El proyecto utiliza diversas variables de entorno para configuración. A continuación se detallan las más importantes:
 
-## Security
+| Variable | Descripción | Valor Predeterminado | Obligatoria |
+|----------|-------------|----------------------|-------------|
+| `SPRING_PROFILES_ACTIVE` | Perfil activo de Spring | `docker` | Sí |
+| `SPRING_DATASOURCE_URL` | URL de conexión a la base de datos | `jdbc:postgresql://postgresql:5432/gestion_nap` | Sí |
+| `SPRING_DATASOURCE_USERNAME` | Usuario de la base de datos | `alibou` | Sí |
+| `SPRING_DATASOURCE_PASSWORD` | Contraseña de la base de datos | `alibou` | Sí |
+| `EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE` | URL de Eureka Server | `http://discovery:8761/eureka/` | Sí |
+| `SPRING_CONFIG_IMPORT` | URL del servidor de configuración | `optional:configserver:http://config-server:8888` | Sí |
+| `KEYCLOAK_URL` | URL de Keycloak | `http://keycloak:8080` | Sí |
+| `KEYCLOAK_REALM` | Realm de Keycloak | `osRoom` | Sí |
+| `LOGGING_LEVEL_*` | Nivel de logging para diferentes paquetes | Varía | No |
 
-The platform uses Keycloak for authentication and authorization. Default credentials:
+## Documentación de API
 
-- Admin User: admin
-- Admin Password: admin
+La documentación de API está disponible a través de OpenAPI (Swagger) para cada servicio en el endpoint `/swagger-ui.html`. La documentación incluye:
 
-**Note**: Change default credentials in production environments.
+- Descripción detallada de endpoints
+- Modelos de datos con ejemplos
+- Códigos de respuesta y manejo de errores
+- Mecanismos de autenticación
+- Pruebas interactivas de API
 
-## Monitoring and Observability
+### Convenciones de API
 
-- **Health Checks**: Each service exposes health endpoints via Spring Boot Actuator
-- **Distributed Tracing**: Zipkin provides visualization of service interactions
-- **Database Administration**: PgAdmin for PostgreSQL database management
+Los endpoints siguen las siguientes convenciones:
 
-## Contributing
+- API RESTful con uso adecuado de métodos HTTP
+- Versionado mediante URL path (/api/v1/...)
+- Respuestas consistentes con envelope pattern
+- Paginación estándar con parámetros page, size, sort
+- Filtrado mediante query parameters
+- Manejo unificado de errores con códigos y mensajes estandarizados
 
-Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
+## Seguridad e Identidad
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+El sistema utiliza Keycloak para autenticación y autorización con las siguientes características:
 
-## License
+### Configuración de Keycloak
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **Realm**: osRoom
+- **Clientes**: Configurados por microservicio con scope y roles específicos
+- **Roles**: Jerarquía de roles con herencia de permisos
+- **Flujos de Autenticación**: Password, Social Login, MFA
+- **Federación de Identidad**: LDAP/Active Directory (opcional)
+
+### Modelo de Permisos
+
+El sistema implementa un modelo de permisos basado en roles (RBAC) con granularidad fina:
+
+| Rol | Descripción | Permisos Generales |
+|-----|-------------|-------------------|
+| `ADMIN` | Administrador del sistema | Acceso completo |
+| `SCHOOL_ADMIN` | Administrador de escuela | Gestión escolar |
+| `TEACHER` | Profesor | Gestión de aulas y actividades |
+| `STUDENT` | Estudiante | Acceso a aulas y actividades asignadas |
+| `PARENT` | Padre/Tutor | Visualización de progreso de estudiantes |
+
+### Credenciales Predeterminadas
+
+- Usuario Administrador: admin
+- Contraseña Administrador: admin
+
+**Nota**: Cambie las credenciales predeterminadas en entornos de producción.
+
+## Monitorización y Observabilidad
+
+El sistema implementa un enfoque integral para monitorización y observabilidad:
+
+### Endpoints de Salud
+
+Cada servicio expone endpoints de salud a través de Spring Boot Actuator:
+- `/actuator/health`: Estado general del servicio
+- `/actuator/info`: Información del servicio
+- `/actuator/metrics`: Métricas detalladas
+- `/actuator/prometheus`: Métricas en formato Prometheus
+
+### Trazabilidad Distribuida
+
+Zipkin proporciona visualización de interacciones entre servicios:
+- Registro de latencia entre servicios
+- Trazas completas de transacciones
+- Identificación de cuellos de botella
+- Correlación de logs entre servicios
+
+### Administración de Base de Datos
+
+PgAdmin para gestión de bases de datos PostgreSQL:
+- Administración de esquemas y tablas
+- Monitoreo de rendimiento
+- Ejecución de consultas
+- Gestión de índices y optimización
+
+## Estrategia de Pruebas
+
+El proyecto implementa una estrategia de pruebas en múltiples niveles:
+
+### Pruebas Unitarias
+
+- Framework: JUnit 5, Mockito
+- Cobertura objetivo: >80%
+- Enfoque: Lógica de negocio y validaciones
+
+### Pruebas de Integración
+
+- Framework: Spring Boot Test, Testcontainers
+- Enfoque: Interacción con bases de datos y servicios externos
+- Automatización: Pipeline CI/CD
+
+### Pruebas de Contrato
+
+- Framework: Spring Cloud Contract
+- Enfoque: Contratos entre microservicios
+- CDC (Consumer-Driven Contracts)
+
+### Pruebas End-to-End
+
+- Framework: Selenium, RestAssured
+- Enfoque: Flujos completos de usuario
+- Automatización: Ejecución periódica
+
+## Gestión de Datos
+
+### Esquema de Base de Datos
+
+El sistema utiliza múltiples bases de datos PostgreSQL con los siguientes esquemas principales:
+
+- **gestion_nap**: Esquema principal de gestión
+- **keycloak**: Datos de identidad y acceso
+- Esquemas específicos por microservicio siguiendo el patrón Database-per-Service
+
+### Migración de Datos
+
+- Framework: Flyway para migraciones controladas
+- Estrategia: Versiones incrementales con scripts idempotentes
+- Rollback: Scripts de rollback para cada migración
+
+### Respaldo y Recuperación
+
+- Estrategia: Respaldos incrementales diarios, completos semanales
+- Retención: 30 días para respaldos diarios, 12 meses para semanales
+- Pruebas: Verificación mensual de procedimientos de recuperación
+
+## Escalabilidad
+
+### Estrategias de Escalado
+
+El sistema está diseñado para escalabilidad horizontal:
+
+- Servicios stateless para facilitar replicación
+- Balanceo de carga a nivel de servicio
+- Caché distribuida con Redis
+- Particionamiento de bases de datos para alta carga
+
+### Consideraciones de Rendimiento
+
+- Optimización de consultas con índices apropiados
+- Implementación de patrones CQRS para servicios de alta demanda
+- Uso de caché en múltiples niveles
+- Paginación y optimización de carga diferida
+
+## Proceso de Desarrollo
+
+### Flujo de Trabajo Git
+
+El proyecto sigue un flujo de trabajo GitFlow:
+
+1. `main`: Código de producción estable
+2. `develop`: Integración para próxima versión
+3. `feature/*`: Nuevas funcionalidades
+4. `release/*`: Preparación para lanzamiento
+5. `hotfix/*`: Correcciones urgentes en producción
+
+### Estándares de Código
+
+- Convenciones Java: Google Java Style Guide
+- API REST: Best Practices de REST
+- Revisión de código: Obligatoria para todas las contribuciones
+- Análisis estático: SonarQube, SpotBugs
+
+## Resolución de Problemas
+
+### Problemas Comunes y Soluciones
+
+1. **Servicios no se registran en Eureka**
+   - Verificar conectividad de red entre contenedores
+   - Comprobar configuración de hostname y preferDnsServiceDiscovery
+
+2. **Errores de autenticación con Keycloak**
+   - Verificar configuración de clientes y secretos
+   - Comprobar mapeo de roles y permisos
+
+3. **Problemas de conectividad a base de datos**
+   - Verificar credenciales y URL de conexión
+   - Comprobar estado y health check de PostgreSQL
+
+### Logs y Diagnóstico
+
+- Ubicación de logs: `/var/logs/` en cada contenedor
+- Nivel de detalle: Configurable mediante variables de entorno
+- Formato: JSON estructurado para procesamiento automatizado
+- Agregación: ELK Stack (opcional para despliegues avanzados)
+
+## Contribuciones
+
+Las contribuciones son bienvenidas. Por favor, lea nuestras directrices de contribución antes de enviar pull requests.
+
+1. Bifurque (fork) el repositorio
+2. Cree su rama de funcionalidad (`git checkout -b feature/funcionalidad-increible`)
+3. Commit de sus cambios (`git commit -m 'Añadir funcionalidad increíble'`)
+4. Push a la rama (`git push origin feature/funcionalidad-increible`)
+5. Abra un Pull Request
+
+### Proceso de Revisión
+
+- Revisión obligatoria por al menos un mantenedor
+- Conformidad con estándares de código y pruebas
+- Documentación adecuada de cambios
+- Pruebas automatizadas que pasen
+
+## Licencia
+
+Este proyecto está licenciado bajo una Licencia de Uso No Comercial - consulte el archivo [LICENSE](LICENSE) para más detalles. El software puede ser utilizado libremente solo para fines no comerciales. Cualquier uso comercial requiere permiso explícito por escrito del titular de los derechos de autor.
