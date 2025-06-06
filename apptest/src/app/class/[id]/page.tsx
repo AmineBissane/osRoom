@@ -111,7 +111,9 @@ const mockActivities: Activity[] = [
 ]
 
 export default function ClassPage({ params }: { params: { id: string } }) {
-  const id = params.id;
+  // Use React.use to properly unwrap the params promise
+  const resolvedParams = React.use(Promise.resolve(params));
+  const id = resolvedParams.id;
   const [activities, setActivities] = useState<Activity[]>([]);
   const [newActivity, setNewActivity] = useState({
     title: "",
