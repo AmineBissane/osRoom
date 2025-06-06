@@ -347,11 +347,21 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [activityId, setActivityId] = useState<string>('');
+
+  // Initialize activityId from params when component mounts
+  useEffect(() => {
+    if (params && params.id) {
+      setActivityId(params.id);
+    }
+  }, [params]);
 
   // Verificar localStorage para estado de entrega al cargar el componente
   useEffect(() => {
+    if (!activityId) return; // Don't proceed if activityId is not set yet
+    
     try {
-      const savedData = localStorage.getItem(`activity_submission_${params.id}`);
+      const savedData = localStorage.getItem(`activity_submission_${activityId}`);
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         // Verificar que no hayan pasado más de 5 minutos (300000 ms)
@@ -362,22 +372,30 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           setUserHasSubmitted(true);
         } else {
           // Eliminar datos antiguos
-          localStorage.removeItem(`activity_submission_${params.id}`);
+          localStorage.removeItem(`activity_submission_${activityId}`);
         }
       }
     } catch (err) {
       console.error('Error al recuperar estado de localStorage:', err);
     }
-  }, [params.id]);
+  }, [activityId]);
+
+  // Fetch activity data when activityId is available
+  useEffect(() => {
+    if (activityId) {
+      fetchActivity();
+      checkUserSubmission(activityId);
+    }
+  }, [activityId]);
 
   const fetchActivity = async () => {
     try {
       setIsLoading(true);
       
-      console.log('Fetching activity details for ID:', params.id);
+      console.log('Fetching activity details for ID:', activityId);
       
       // Use our proxy API endpoint
-      const response = await fetch(`/api/proxy/activities/${params.id}`, {
+      const response = await fetch(`/api/proxy/activities/${activityId}`, {
           headers: {
           'Content-Type': 'application/json',
             'Accept': 'application/json'
@@ -410,16 +428,71 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         setIsExpired(true);
       }
       
-      // If the activity has a file, fetch responses
-      if (data.fileId) {
-        fetchResponses();
-      }
-      
+      // Set loading to false
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching activity:', error);
       setError('Error al cargar la actividad');
-        setIsLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Save submission state to localStorage
+  const saveSubmissionState = () => {
+    try {
+      if (!activityId) return;
+      
+      // Guardar estado de entrega con timestamp
+      const submissionData = {
+        hasSubmitted: true,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`activity_submission_${activityId}`, JSON.stringify(submissionData));
+      console.log('Estado de entrega guardado en localStorage');
+    } catch (err) {
+      console.error('Error al guardar estado en localStorage:', err);
+    }
+  };
+  
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+  
+  // Download a file
+  const downloadFile = async (fileId: string | undefined) => {
+    if (!fileId) {
+      toast.error('No file ID provided');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/proxy/file-storage/download/${fileId}?preview=false`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `file-${fileId}`;
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Error al descargar el archivo');
     }
   };
 
@@ -507,7 +580,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const handleDeleteActivity = async () => {
     try {
       setIsDeleting(true);
-      console.log(`Intentando eliminar actividad con ID: ${params.id}`);
+      console.log(`Intentando eliminar actividad con ID: ${activityId}`);
       
       // Obtener el token
       const token = document.cookie
@@ -519,7 +592,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         throw new Error('No se encontró el token de autenticación');
       }
       
-      const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${params.id}`, {
+      const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${activityId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -558,7 +631,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
 
     try {
       // Check if user has already submitted first
-      const hasSubmitted = await checkUserSubmission(params.id);
+      const hasSubmitted = await checkUserSubmission(activityId);
       if (hasSubmitted) {
         // El mensaje de error ya se muestra en checkUserSubmission
         setIsSubmitting(false);
@@ -604,7 +677,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       // Build the backend URL with query parameters
       const url = new URL('http://82.29.168.17:8222/api/v1/activitiesresponses/with-file');
-      url.searchParams.append('activityId', params.id);
+      url.searchParams.append('activityId', activityId);
       url.searchParams.append('studentId', userId);
       url.searchParams.append('studentName', userName);
       
