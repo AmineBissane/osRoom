@@ -3,7 +3,7 @@
 # Get an access token from Keycloak
 echo "Getting access token from Keycloak..."
 ACCESS_TOKEN=$(curl -s -X POST \
-  "http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token" \
+  "http://localhost:8080/realms/osRoom/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=admin" \
   -d "password=admin" \

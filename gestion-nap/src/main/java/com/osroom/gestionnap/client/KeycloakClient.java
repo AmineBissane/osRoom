@@ -11,7 +11,7 @@ import java.util.Map;
 
 @FeignClient(
     name = "keycloak", 
-    url = "${app.keycloak.server-url:http://82.29.168.17:8080}",
+    url = "${app.keycloak.server-url:http://keycloak:8080}",
     configuration = KeycloakClientConfig.class
 )
 public interface KeycloakClient {

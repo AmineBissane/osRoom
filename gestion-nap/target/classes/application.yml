@@ -78,7 +78,7 @@ logging:
 
 app:
   keycloak:
-    server-url: ${KEYCLOAK_URL:http://82.29.168.17:8080}
+    server-url: ${KEYCLOAK_URL:http://keycloak:8080}
     realm: ${KEYCLOAK_REALM:osRoom}
     client-id: ${KEYCLOAK_CLIENT_ID:gestion-nap}
     client-secret: ${KEYCLOAK_CLIENT_SECRET:secret}

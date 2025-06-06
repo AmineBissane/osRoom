@@ -23,7 +23,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=alibou
       - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://discovery:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - KEYCLOAK_URL=http://82.29.168.17:8080
+      - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=osRoom
       - KEYCLOAK_CLIENT_ID=gestion-nap
       - KEYCLOAK_CLIENT_SECRET=secret
@@ -39,6 +39,24 @@ services:
       timeout: 10s
       retries: 5
 
+  apptest:
+    build:
+      context: ./apptest
+      dockerfile: Dockerfile
+    container_name: apptest
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_KEYCLOAK_URL=http://keycloak:8080
+      - NEXT_PUBLIC_KEYCLOAK_REALM=osRoom
+      - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=frontend
+      - NEXT_PUBLIC_API_URL=http://gateway:8222
+    depends_on:
+      - keycloak
+      - gateway
+    networks:
+      - postgres
+    restart: unless-stopped
 
   livekit:
     image: livekit/livekit-server
