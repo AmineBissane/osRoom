@@ -226,6 +226,8 @@ if (typeof window !== 'undefined') {
 }
 
 export default function ActivityPage({ params }: { params: { id: string } }) {
+  // Use React.use to properly unwrap the params promise
+  const resolvedParams = React.use(Promise.resolve(params));
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -258,15 +260,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   // Initialize activityId from params when component mounts
   useEffect(() => {
     // Extract ID directly and set it immediately
-    if (params && params.id) {
-      console.log("Setting activity ID from params:", params.id);
-      setActivityId(params.id);
+    if (resolvedParams && resolvedParams.id) {
+      console.log("Setting activity ID from params:", resolvedParams.id);
+      setActivityId(resolvedParams.id);
     } else {
       console.error("No activity ID found in params");
       setError("No se pudo cargar la actividad: ID no encontrado");
     }
     setInitializing(false);
-  }, []);
+  }, [resolvedParams]);
 
   // Check authentication status and ensure token validity
   useEffect(() => {
@@ -279,6 +281,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (!token) {
         console.error("No authentication token found");
         setAuthError("No se encontró un token de autenticación válido. Por favor, inicie sesión nuevamente.");
+        setIsLoading(false); // Make sure to clear loading state
         
         // Delay redirect slightly to ensure state updates
         setTimeout(() => {
@@ -299,6 +302,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         if (!response.ok) {
           console.error("Token validation failed");
           setAuthError("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
+          setIsLoading(false); // Make sure to clear loading state
           
           // Delay redirect slightly to ensure state updates
           setTimeout(() => {
@@ -307,6 +311,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         }
       } catch (error) {
         console.error("Error checking authentication:", error);
+        setIsLoading(false); // Make sure to clear loading state
       }
     };
     
@@ -353,12 +358,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           // Check user submission
           await checkUserSubmission(activityId);
           
-          // Ensure loading state is set to false when everything is done
-          setIsLoading(false);
         } catch (error) {
           console.error("Error fetching data:", error);
-          setIsLoading(false);
           setError("Error al cargar los datos de la actividad");
+        } finally {
+          // Ensure loading state is set to false when everything is done, whether successful or not
+          setIsLoading(false);
         }
       };
       
@@ -514,14 +519,19 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       console.log('Verificando entregas para el usuario:', userId);
       
       // Use our proxy API endpoint to check user responses
+      const userUrl = `/api/proxy/activitiesresponses/activity/${activityId}/user/${userId}`;
+      console.log('Consultando endpoint para verificar entregas:', userUrl);
+      
+      // Add cache-busting
+      const timestamp = new Date().getTime();
+      const cacheBustingUrl = `${userUrl}?_=${timestamp}`;
+      
       try {
-        const userUrl = `/api/proxy/activitiesresponses/activity/${activityId}/user/${userId}`;
-        console.log('Consultando endpoint para verificar entregas:', userUrl);
-        
-        const userResponse = await fetch(userUrl, {
+        const userResponse = await fetch(cacheBustingUrl, {
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
           }
         });
         
@@ -548,6 +558,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             
             return true;
           }
+        } else {
+          console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
         }
       } catch (error) {
         console.error('Error consultando las entregas del usuario:', error);
