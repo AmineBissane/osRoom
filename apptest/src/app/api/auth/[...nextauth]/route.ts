@@ -34,6 +34,14 @@ const handler = NextAuth({
       session.userProfile = token.profile
       return session
     },
+    async redirect({ url, baseUrl }) {
+      // Handle redirects properly
+      if (url.startsWith(baseUrl)) return url
+      // Handle relative callback URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      // Allow redirects to external URLs if they are allowed
+      return baseUrl
+    }
   },
   pages: {
     signIn: '/login',

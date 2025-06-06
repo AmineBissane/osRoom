@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import Cookies from 'js-cookie'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
@@ -40,8 +41,12 @@ export default function LoginPage() {
       
       toast.success("Login successful")
 
-      // Do a full page refresh to the home page
-      window.location.href = '/'
+      // Get the redirect destination from the URL params or default to home
+      const fromPath = searchParams.get('from')
+      const redirectPath = fromPath || '/'
+      
+      // Do a full page refresh to the redirect path
+      window.location.href = redirectPath
     } catch (error) {
       console.error("Login error:", error)
       toast.error(error instanceof Error ? error.message : "Invalid username or password")

@@ -23,9 +23,11 @@ export function middleware(request: NextRequest) {
 
   // Check if the user is trying to access the login page
   if (request.nextUrl.pathname === '/login') {
-    // If they have a token, redirect to home
+    // If they have a token, redirect to home or the 'from' parameter if available
     if (token) {
-      return NextResponse.redirect(new URL('/', request.url))
+      const fromPath = request.nextUrl.searchParams.get('from')
+      const redirectUrl = fromPath && fromPath !== '/' ? fromPath : '/'
+      return NextResponse.redirect(new URL(redirectUrl, request.url))
     }
     // If no token, allow access to login
     return response
