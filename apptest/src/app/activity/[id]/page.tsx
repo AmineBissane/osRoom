@@ -434,35 +434,104 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         return true;
       }
         
-        // Obtener el token
-        const token = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('access_token='))
-          ?.split('=')[1];
+      // Obtener el token
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('access_token='))
+        ?.split('=')[1];
           
-        if (!token) {
+      if (!token) {
         console.error('No se encontró token al verificar el estado de entrega');
         return false;
       }
       
       // Decodificar el token para obtener el ID del usuario
-          throw new Error('No se encontró el token de autenticación');
-        }
+      const decodedToken = decodeJwt(token);
+      if (!decodedToken || !decodedToken.sub) {
+        console.error('No se pudo obtener el ID de usuario del token');
+        return false;
+      }
+      
+      const userId = decodedToken.sub;
+      console.log('Verificando entregas para el usuario:', userId);
+      
+      // Use our proxy API endpoint to check user responses
+      try {
+        const userUrl = `/api/proxy/activitiesresponses/activity/${activityId}/user/${userId}`;
+        console.log('Consultando endpoint para verificar entregas:', userUrl);
         
-        const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${params.id}`, {
-          method: 'DELETE',
+        const userResponse = await fetch(userUrl, {
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
-            'Origin': 'http://82.29.168.17:3000'
-          },
+            'Accept': 'application/json'
+          }
         });
         
-        if (!directResponse.ok) {
-          const errorText = await directResponse.text();
-          console.error('Error en la respuesta de la solicitud directa:', errorText);
-          throw new Error(`Error al eliminar la actividad: ${directResponse.status}`);
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          console.log('Respuesta del endpoint de usuario:', userData);
+          
+          // Si hay alguna respuesta, el usuario ya ha enviado
+          const hasSubmitted = Array.isArray(userData) && userData.length > 0;
+          
+          if (hasSubmitted) {
+            console.log('El usuario ya ha enviado una respuesta');
+            
+            // Actualizar estado global y mensaje
+            setUserHasSubmitted(true);
+            
+            // Si hay una respuesta con calificación, guardarla en el estado
+            if (userData.length > 0 && userData[0].grade !== undefined) {
+              setSubmittedResponse(userData[0]);
+            }
+            
+            // Guardar en localStorage para persistencia
+            saveSubmissionState();
+            
+            return true;
+          }
         }
+      } catch (error) {
+        console.error('Error consultando las entregas del usuario:', error);
+      }
+      
+      // Si llegamos aquí, no se encontraron respuestas
+      return false;
+    } catch (error) {
+      console.error('Error al verificar entregas del usuario:', error);
+      return false;
+    }
+  };
+  
+  // Function to handle activity deletion
+  const handleDeleteActivity = async () => {
+    try {
+      setIsDeleting(true);
+      console.log(`Intentando eliminar actividad con ID: ${params.id}`);
+      
+      // Obtener el token
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('access_token='))
+        ?.split('=')[1];
+          
+      if (!token) {
+        throw new Error('No se encontró el token de autenticación');
+      }
+      
+      const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${params.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Origin': 'http://82.29.168.17:3000'
+        },
+      });
+      
+      if (!directResponse.ok) {
+        const errorText = await directResponse.text();
+        console.error('Error en la respuesta de la solicitud directa:', errorText);
+        throw new Error(`Error al eliminar la actividad: ${directResponse.status}`);
       }
       
       toast.success('Actividad eliminada correctamente');
