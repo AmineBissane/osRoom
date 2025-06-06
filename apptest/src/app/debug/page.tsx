@@ -9,18 +9,22 @@ export default function DebugPage() {
   const [logs, setLogs] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchLogs = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch('/api/debug');
       if (response.ok) {
         const text = await response.text();
         setLogs(text);
       } else {
-        console.error('Failed to fetch logs');
+        setError(`Failed to fetch logs: ${response.status} ${response.statusText}`);
+        console.error('Failed to fetch logs:', response.status, response.statusText);
       }
     } catch (error) {
+      setError(`Error fetching logs: ${error instanceof Error ? error.message : String(error)}`);
       console.error('Error fetching logs:', error);
     } finally {
       setLoading(false);
@@ -92,6 +96,8 @@ export default function DebugPage() {
           <div className="bg-black text-green-400 p-4 rounded-md font-mono text-sm overflow-auto max-h-[70vh]">
             {loading ? (
               <p>Loading logs...</p>
+            ) : error ? (
+              <p>{error}</p>
             ) : logs ? (
               <pre>{logs}</pre>
             ) : (

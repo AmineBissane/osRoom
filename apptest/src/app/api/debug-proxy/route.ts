@@ -70,7 +70,19 @@ export async function GET(request: Request) {
       }
     });
     
-    const responseData = await response.json();
+    // Get raw response text first
+    const responseText = await response.text();
+    
+    // Try to parse as JSON, but handle empty or invalid responses
+    let responseData;
+    try {
+      responseData = responseText ? JSON.parse(responseText) : null;
+    } catch (parseError) {
+      responseData = {
+        _error: 'Invalid JSON response',
+        _rawText: responseText.substring(0, 500) // Only include first 500 chars
+      };
+    }
     
     // Log the response
     logRequest({
@@ -79,6 +91,9 @@ export async function GET(request: Request) {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
+        rawResponse: responseText.length > 100 ? 
+          `${responseText.substring(0, 100)}... (${responseText.length} chars)` : 
+          responseText,
         data: responseData
       }
     });
@@ -89,7 +104,9 @@ export async function GET(request: Request) {
         requestUrl: url,
         responseStatus: response.status,
         responseStatusText: response.statusText,
-        responseHeaders: Object.fromEntries(response.headers.entries())
+        responseHeaders: Object.fromEntries(response.headers.entries()),
+        responseTextLength: responseText.length,
+        responseTextPreview: responseText.substring(0, 200)
       },
       data: responseData
     }, {

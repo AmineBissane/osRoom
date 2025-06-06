@@ -256,6 +256,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [activityId, setActivityId] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showEmergencyReset, setShowEmergencyReset] = useState(false);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -348,6 +349,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       console.log("Fetching activity with ID:", activityId);
       serverLog("Starting fetch data process", { activityId });
       
+      let fetchDataCompleted = false;
+      
       // Create a function to fetch both activity and user submission data
       const fetchData = async () => {
         try {
@@ -364,6 +367,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           await checkUserSubmission(activityId);
           serverLog("Completed checkUserSubmission");
           
+          // Mark as completed to prevent the timeout from considering this a hanging request
+          fetchDataCompleted = true;
+          
         } catch (error) {
           console.error("Error fetching data:", error);
           serverLog("Error in fetchData", { error: error instanceof Error ? error.message : String(error) });
@@ -375,7 +381,22 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         }
       };
       
+      // Start fetching data
       fetchData();
+      
+      // Set a backup timeout to ensure loading state is cleared even if something goes wrong
+      const backupTimeout = setTimeout(() => {
+        if (!fetchDataCompleted) {
+          serverLog("Backup timeout triggered - fetchData didn't complete in time", { fetchDataCompleted });
+          setIsLoading(false);
+        }
+      }, 10000); // 10 seconds should be more than enough for the fetch to complete
+      
+      // Clear the timeout if the component unmounts or activityId changes
+      return () => {
+        clearTimeout(backupTimeout);
+        serverLog("Cleared backup timeout for fetchData", { activityId });
+      };
     }
   }, [activityId, initializing]);
 
@@ -383,6 +404,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     if (!activityId) {
       console.error("Attempted to fetch activity without ID");
       serverLog("Attempted to fetch activity without ID", { activityId });
+      setIsLoading(false); // Ensure loading state is cleared
       return;
     }
 
@@ -395,69 +417,112 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       const url = `/api/proxy/activities/${activityId}?_=${timestamp}`;
       serverLog('Preparing to fetch activity', { url });
       
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-      });
-      
-      serverLog('Activity fetch response received', { 
-        status: response.status, 
-        ok: response.ok,
-        statusText: response.statusText
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          console.error("Authentication error:", response.status);
-          serverLog('Authentication error in fetchActivity', { status: response.status });
-          setAuthError("Error de autenticación. Por favor, inicie sesión nuevamente.");
-          window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        });
+        
+        serverLog('Activity fetch response received', { 
+          status: response.status, 
+          ok: response.ok,
+          statusText: response.statusText
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            console.error("Authentication error:", response.status);
+            serverLog('Authentication error in fetchActivity', { status: response.status });
+            setAuthError("Error de autenticación. Por favor, inicie sesión nuevamente.");
+            setTimeout(() => {
+              window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+            }, 100);
+            setIsLoading(false); // Ensure loading state is cleared
+            return;
+          }
+          
+          if (response.status === 404) {
+            serverLog('Activity not found', { status: 404 });
+            setError('Actividad no encontrada');
+          } else {
+            serverLog('Error loading activity', { status: response.status });
+            setError(`Error al cargar la actividad: ${response.status}`);
+          }
+          setIsLoading(false); // Ensure loading state is cleared
           return;
         }
         
-        if (response.status === 404) {
-          serverLog('Activity not found', { status: 404 });
-          setError('Actividad no encontrada');
-        } else {
-          serverLog('Error loading activity', { status: response.status });
-          setError(`Error al cargar la actividad: ${response.status}`);
-        }
-        return;
-      }
-      
-      const data = await response.json();
-      console.log('Activity data:', data);
-      serverLog('Activity data received', { data });
-      
-      // Format the activity data
-      const formattedActivity = {
-        ...data,
-        endDate: data.endDate ? new Date(data.endDate) : undefined
-      };
-      
-      setActivity(formattedActivity);
-      serverLog('Activity state updated', { 
-        id: formattedActivity.id, 
-        name: formattedActivity.name 
-      });
-      
-      // Check if the activity has expired
-      const isActivityExpired = formattedActivity.endDate && new Date() > formattedActivity.endDate;
-      if (isActivityExpired) {
-        serverLog('Activity is expired', { 
-          endDate: formattedActivity.endDate?.toISOString(),
-          now: new Date().toISOString()
+        // Get response as text first to safely handle JSON parsing
+        const responseText = await response.text();
+        serverLog('Activity response text received', { 
+          textLength: responseText.length,
+          textPreview: responseText.substring(0, 100) + (responseText.length > 100 ? '...' : '')
         });
-        setIsExpired(true);
+        
+        let data;
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch (parseError) {
+          console.error('Error parsing activity JSON:', parseError);
+          serverLog('Error parsing activity JSON', { 
+            error: parseError instanceof Error ? parseError.message : String(parseError),
+            textPreview: responseText.substring(0, 200)
+          });
+          setError('Error al procesar la respuesta del servidor');
+          setIsLoading(false); // Ensure loading state is cleared
+          return;
+        }
+        
+        if (!data) {
+          console.error('Activity data is null or empty');
+          serverLog('Activity data is null or empty', {});
+          setError('No se recibieron datos de la actividad');
+          setIsLoading(false); // Ensure loading state is cleared
+          return;
+        }
+        
+        console.log('Activity data:', data);
+        serverLog('Activity data received', { data });
+        
+        // Format the activity data
+        const formattedActivity = {
+          ...data,
+          endDate: data.endDate ? new Date(data.endDate) : undefined
+        };
+        
+        setActivity(formattedActivity);
+        serverLog('Activity state updated', { 
+          id: formattedActivity.id, 
+          name: formattedActivity.name 
+        });
+        
+        // Check if the activity has expired
+        const isActivityExpired = formattedActivity.endDate && new Date() > formattedActivity.endDate;
+        if (isActivityExpired) {
+          serverLog('Activity is expired', { 
+            endDate: formattedActivity.endDate?.toISOString(),
+            now: new Date().toISOString()
+          });
+          setIsExpired(true);
+        }
+      } catch (fetchError) {
+        console.error('Fetch error in fetchActivity:', fetchError);
+        serverLog('Fetch error in fetchActivity', { 
+          error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+        });
+        setError('Error de conexión al cargar la actividad');
+        setIsLoading(false); // Ensure loading state is cleared
+        return;
       }
     } catch (error) {
       console.error('Error fetching activity:', error);
       serverLog('Error in fetchActivity', { 
         error: error instanceof Error ? error.message : String(error)
       });
+      setIsLoading(false); // Ensure loading state is cleared
       throw error; // Propagate the error to be handled by the parent function
     }
   };
@@ -568,64 +633,104 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       const cacheBustingUrl = `${userUrl}?_=${timestamp}`;
       
       serverLog('Sending fetch request', { cacheBustingUrl });
-      const userResponse = await fetch(cacheBustingUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-      });
       
-      serverLog('Received response', { 
-        status: userResponse.status,
-        ok: userResponse.ok,
-        statusText: userResponse.statusText
-      });
-      
-      if (!userResponse.ok) {
-        console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
-        serverLog('Error in server response', { 
+      try {
+        const userResponse = await fetch(cacheBustingUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        });
+        
+        serverLog('Received response', { 
           status: userResponse.status,
+          ok: userResponse.ok,
           statusText: userResponse.statusText
         });
-        return false;
-      }
-      
-      const userData = await userResponse.json();
-      console.log('Respuesta del endpoint de usuario:', userData);
-      serverLog('User submission data', { 
-        dataLength: Array.isArray(userData) ? userData.length : 'not an array',
-        data: userData
-      });
-      
-      // Si hay alguna respuesta, el usuario ya ha enviado
-      const hasSubmitted = Array.isArray(userData) && userData.length > 0;
-      
-      if (hasSubmitted) {
-        console.log('El usuario ya ha enviado una respuesta');
-        serverLog('User has submitted', { hasSubmitted: true });
         
-        // Actualizar estado global y mensaje
-        setUserHasSubmitted(true);
-        serverLog('Set userHasSubmitted to true');
-        
-        // Si hay una respuesta con calificación, guardarla en el estado
-        if (userData.length > 0 && userData[0].grade !== undefined) {
-          setSubmittedResponse(userData[0]);
-          serverLog('Set submitted response with grade', { grade: userData[0].grade });
+        if (!userResponse.ok) {
+          console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
+          serverLog('Error in server response', { 
+            status: userResponse.status,
+            statusText: userResponse.statusText
+          });
+          // Set loading state to false explicitly here to prevent infinite loading
+          setIsLoading(false);
+          return false;
         }
         
-        // Guardar en localStorage para persistencia
-        saveSubmissionState();
-        serverLog('Saved submission state to localStorage');
+        // Get the response as text first
+        const responseText = await userResponse.text();
+        serverLog('Raw response text', { 
+          textLength: responseText.length,
+          text: responseText.length < 100 ? responseText : responseText.substring(0, 100) + '...'
+        });
         
-        return true;
-      } else {
-        // Explicitly set to false if no submissions found
-        console.log('El usuario no ha enviado ninguna respuesta');
-        serverLog('User has not submitted any responses', { hasSubmitted: false });
-        setUserHasSubmitted(false);
-        serverLog('Set userHasSubmitted to false');
+        // Try to parse the response as JSON
+        let userData: any[] = [];
+        if (responseText.trim()) {
+          try {
+            userData = JSON.parse(responseText);
+            // Ensure it's an array
+            if (!Array.isArray(userData)) {
+              serverLog('Response is not an array', { userData });
+              userData = [];
+            }
+          } catch (parseError) {
+            serverLog('Error parsing JSON response', { 
+              error: parseError instanceof Error ? parseError.message : String(parseError),
+              responseText
+            });
+            userData = [];
+          }
+        } else {
+          serverLog('Empty response text', {});
+        }
+        
+        console.log('Respuesta del endpoint de usuario:', userData);
+        serverLog('User submission data', { 
+          dataLength: userData.length,
+          data: userData
+        });
+        
+        // Si hay alguna respuesta, el usuario ya ha enviado
+        const hasSubmitted = Array.isArray(userData) && userData.length > 0;
+        
+        if (hasSubmitted) {
+          console.log('El usuario ya ha enviado una respuesta');
+          serverLog('User has submitted', { hasSubmitted: true });
+          
+          // Actualizar estado global y mensaje
+          setUserHasSubmitted(true);
+          serverLog('Set userHasSubmitted to true');
+          
+          // Si hay una respuesta con calificación, guardarla en el estado
+          if (userData.length > 0 && userData[0].grade !== undefined) {
+            setSubmittedResponse(userData[0]);
+            serverLog('Set submitted response with grade', { grade: userData[0].grade });
+          }
+          
+          // Guardar en localStorage para persistencia
+          saveSubmissionState();
+          serverLog('Saved submission state to localStorage');
+          
+          return true;
+        } else {
+          // Explicitly set to false if no submissions found
+          console.log('El usuario no ha enviado ninguna respuesta');
+          serverLog('User has not submitted any responses', { hasSubmitted: false });
+          setUserHasSubmitted(false);
+          serverLog('Set userHasSubmitted to false');
+          return false;
+        }
+      } catch (fetchError) {
+        console.error('Error en la petición fetch:', fetchError);
+        serverLog('Fetch error in checkUserSubmission', { 
+          error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+        });
+        // Set loading state to false explicitly here to prevent infinite loading
+        setIsLoading(false);
         return false;
       }
     } catch (error) {
@@ -633,6 +738,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       serverLog('Error checking user submissions', { 
         error: error instanceof Error ? error.message : String(error)
       });
+      // Set loading state to false explicitly here to prevent infinite loading
+      setIsLoading(false);
       return false;
     }
   };
@@ -1266,6 +1373,36 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     });
   }, []);
 
+  // Determine if loading is taking too long
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (isLoading) {
+      timeoutId = setTimeout(() => {
+        setShowEmergencyReset(true);
+        serverLog("Emergency reset button shown", { isLoading });
+      }, 5000); // Show after 5 seconds of loading
+    } else {
+      setShowEmergencyReset(false);
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isLoading]);
+  
+  // Handle emergency reset
+  const handleEmergencyReset = () => {
+    serverLog("Emergency reset triggered by user", { 
+      isLoading, 
+      initializing,
+      activityId,
+      userHasSubmitted 
+    });
+    setIsLoading(false);
+    setError("La carga se ha reiniciado. Por favor, intenta recargar la página si sigues teniendo problemas.");
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {initializing ? (
@@ -1280,6 +1417,19 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           <div className="text-center">
             <div className="spinner mb-4"></div>
             <p>Cargando actividad...</p>
+            
+            {showEmergencyReset && (
+              <div className="mt-8 p-4 bg-red-100 border border-red-500 text-red-700 rounded-md">
+                <p className="font-bold">La carga está tardando más de lo esperado</p>
+                <p className="mb-4">Puedes reiniciar la carga si crees que hay un problema</p>
+                <button 
+                  onClick={handleEmergencyReset}
+                  className="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded"
+                >
+                  Reiniciar Carga
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : error ? (
