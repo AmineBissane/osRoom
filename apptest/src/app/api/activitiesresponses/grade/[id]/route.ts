@@ -74,7 +74,7 @@ export async function POST(
     }
 
     // Make request to backend API with all necessary details
-    const apiUrl = `http://localhost:8222/api/v1/activitiesresponses/${id}/grade`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`
     console.log(`Making request to: ${apiUrl}`)
     console.log(`Grade value: ${grade}`)
     console.log(`Token (first 30 chars): ${accessToken.substring(0, 30)}...`)
@@ -86,7 +86,7 @@ export async function POST(
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Origin': 'http://localhost:3000'
+          'Origin': 'http://82.29.168.17:3000'
         },
         body: JSON.stringify({ grade }),
         credentials: 'include'

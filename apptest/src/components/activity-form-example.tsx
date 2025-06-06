@@ -55,7 +55,7 @@ export default function ActivityFormExample() {
 
       // Send directly to the backend API using form-data
       console.log('Sending request to backend API');
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -266,7 +266,7 @@ export default function ActivityFormExample() {
         )}
       </CardContent>
       <CardFooter className="flex justify-between text-sm text-muted-foreground">
-        <p className="text-red-500 font-semibold">Direct backend request to: http://localhost:8222/api/v1/activities</p>
+        <p className="text-red-500 font-semibold">Direct backend request to: http://82.29.168.17:8222/api/v1/activities</p>
       </CardFooter>
     </Card>
   )

@@ -34,7 +34,7 @@ services:
     networks:
       - postgres
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8226/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://82.29.168.17:8226/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -60,7 +60,7 @@ services:
     networks:
       - postgres
     healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1" ]
+      test: [ "CMD-SHELL", "curl -f http://82.29.168.17:8888/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -75,7 +75,7 @@ services:
     networks:
       - postgres
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8761/actuator/health" ]
+      test: [ "CMD", "curl", "-f", "http://82.29.168.17:8761/actuator/health" ]
       interval: 10s
       timeout: 5s
       retries: 10

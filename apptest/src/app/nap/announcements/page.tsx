@@ -72,7 +72,7 @@ export default function AnnouncementsPage() {
   const fetchAnnouncements = async () => {
     try {
       setLoading(true);
-      const data = await api.get<Announcement[]>('http://localhost:8226/api/v1/anuncios/vigentes');
+      const data = await api.get<Announcement[]>('http://82.29.168.17:8226/api/v1/anuncios/vigentes');
       setAnnouncements(data);
     } catch (error) {
       console.error('Error:', error);
@@ -84,7 +84,7 @@ export default function AnnouncementsPage() {
 
   const fetchClassrooms = async () => {
     try {
-      const data = await api.get<Classroom[]>('http://localhost:8226/api/v1/classrooms');
+      const data = await api.get<Classroom[]>('http://82.29.168.17:8226/api/v1/classrooms');
       setClassrooms(data);
     } catch (error) {
       console.error('Error:', error);
@@ -102,7 +102,7 @@ export default function AnnouncementsPage() {
         announcementData.fechaExpiracion = `${announcementData.fechaExpiracion}T23:59:59`;
       }
       
-      await api.post('http://localhost:8226/api/v1/anuncios', announcementData);
+      await api.post('http://82.29.168.17:8226/api/v1/anuncios', announcementData);
       toast.success('Anuncio creado correctamente');
       setDialogOpen(false);
       setNewAnnouncement({
@@ -122,7 +122,7 @@ export default function AnnouncementsPage() {
 
   const handleDeleteAnnouncement = async (id: number) => {
     try {
-      await api.delete(`http://localhost:8226/api/v1/anuncios/${id}`);
+      await api.delete(`http://82.29.168.17:8226/api/v1/anuncios/${id}`);
       toast.success('Anuncio eliminado correctamente');
       fetchAnnouncements();
     } catch (error) {

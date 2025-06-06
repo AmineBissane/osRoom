@@ -82,7 +82,7 @@ export default function AttendancePage() {
         
         // Race the actual request against the timeout
         await Promise.race([
-          api.get('http://localhost:8226/api/v1/users'),
+          api.get('http://82.29.168.17:8226/api/v1/users'),
           timeoutPromise
         ]);
         
@@ -174,7 +174,7 @@ export default function AttendancePage() {
   const fetchClassrooms = async () => {
     try {
       setLoading(true);
-      const data = await api.get<Classroom[]>('http://localhost:8226/api/v1/classrooms')
+      const data = await api.get<Classroom[]>('http://82.29.168.17:8226/api/v1/classrooms')
         .catch(error => {
           console.error('Error fetching classrooms:', error);
           return null;
@@ -187,7 +187,7 @@ export default function AttendancePage() {
       }
       
       // Try the my-classrooms endpoint as fallback
-      const myClassrooms = await api.get<Classroom[]>('http://localhost:8226/api/v1/classrooms/my-classrooms')
+      const myClassrooms = await api.get<Classroom[]>('http://82.29.168.17:8226/api/v1/classrooms/my-classrooms')
         .catch(error => {
           console.error('Error fetching my classrooms:', error);
           return null;
@@ -263,7 +263,7 @@ export default function AttendancePage() {
       }
 
       // Primero intentamos obtener los registros de asistencia existentes para esta fecha
-      const attendanceResponse = await api.get<AttendanceRecord[]>(`http://localhost:8226/api/v1/asistencias?classroomId=${classroomId}&fecha=${attendanceDate}`)
+      const attendanceResponse = await api.get<AttendanceRecord[]>(`http://82.29.168.17:8226/api/v1/asistencias?classroomId=${classroomId}&fecha=${attendanceDate}`)
         .catch(error => {
           console.warn('Error fetching existing attendance:', error);
           return [];
@@ -277,7 +277,7 @@ export default function AttendancePage() {
       try {
         // Make direct call to Keycloak users endpoint through our backend
         const keycloakUsers = await Promise.race([
-          api.get<any[]>('http://localhost:8226/api/v1/users'),
+          api.get<any[]>('http://82.29.168.17:8226/api/v1/users'),
           new Promise<null>((_, reject) => 
             setTimeout(() => reject(new Error('Timeout fetching users from Keycloak')), 3000)
           )
@@ -340,7 +340,7 @@ export default function AttendancePage() {
       if (students.length === 0) {
         try {
           // Try the dedicated students endpoint that should pull from Keycloak
-          const studentsResponse = await api.get<any[]>(`http://localhost:8226/api/v1/classrooms/${classroomId}/students`);
+          const studentsResponse = await api.get<any[]>(`http://82.29.168.17:8226/api/v1/classrooms/${classroomId}/students`);
           
           if (studentsResponse && Array.isArray(studentsResponse) && studentsResponse.length > 0) {
             console.log(`Found ${studentsResponse.length} students for classroom ${classroomId}`);
@@ -384,7 +384,7 @@ export default function AttendancePage() {
       // If still no students, try with classroom details
       if (students.length === 0) {
         try {
-          const classroom = await api.get<Classroom>(`http://localhost:8226/api/v1/classrooms/${classroomId}`);
+          const classroom = await api.get<Classroom>(`http://82.29.168.17:8226/api/v1/classrooms/${classroomId}`);
           if (classroom && classroom.students && Array.isArray(classroom.students)) {
             students = classroom.students;
             
@@ -490,7 +490,7 @@ export default function AttendancePage() {
   const saveAttendance = async () => {
     try {
       setSaving(true);
-      const savedRecords = await api.post<AttendanceRecord[]>('http://localhost:8226/api/v1/asistencias/batch', attendanceRecords);
+      const savedRecords = await api.post<AttendanceRecord[]>('http://82.29.168.17:8226/api/v1/asistencias/batch', attendanceRecords);
       
       // Actualizar los registros con los IDs asignados
       setAttendanceRecords(savedRecords);

@@ -66,7 +66,7 @@ export async function GET(
       )
     }
 
-    const apiUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${id}`
     console.log(`Making request to: ${apiUrl}`)
 
     const response = await fetch(apiUrl, {
@@ -277,7 +277,7 @@ export async function POST(
     }
 
     // First, fetch the activity to check if it has expired
-    const activityUrl = `http://localhost:8222/api/v1/activities/${id}`
+    const activityUrl = `http://82.29.168.17:8222/api/v1/activities/${id}`
     console.log(`Fetching activity details: ${activityUrl}`)
     
     const activityResponse = await fetch(activityUrl, {
@@ -312,7 +312,7 @@ export async function POST(
       }
     }
 
-    const apiUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${id}`
     console.log(`Checking for existing responses: ${apiUrl}`)
     
     // Check if the user has already submitted a response
@@ -355,7 +355,7 @@ export async function POST(
     console.log(`Submitting response for activity ${id}, user ${userId}`)
 
     // Submit the response
-    const submitUrl = `http://localhost:8222/api/v1/activitiesresponses`
+    const submitUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses`
     console.log(`Submitting to: ${submitUrl}`)
     
     const submitResponse = await fetch(submitUrl, {

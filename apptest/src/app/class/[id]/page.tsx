@@ -150,7 +150,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
       }
       
       // Usar conexión directa al backend
-      const directUrl = `http://localhost:8222/api/v1/activities/classrooms/${id}`;
+      const directUrl = `http://82.29.168.17:8222/api/v1/activities/classrooms/${id}`;
       console.log(`Consultando actividades directamente al backend: ${directUrl}`);
       
       const directResponse = await fetch(directUrl, {
@@ -258,7 +258,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
             console.log(`Consultando respuestas para actividad ${activity.id} y usuario ${userId}`);
             
             // Consulta directa al backend
-            const responseUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${activity.id}/user/${userId}`;
+            const responseUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activity.id}/user/${userId}`;
             const response = await fetch(responseUrl, {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -356,7 +356,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
       console.log('Verificando entregas para el usuario:', userId);
       
       // Consultar directamente al backend
-      const response = await fetch(`http://localhost:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`, {
+      const response = await fetch(`http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -444,10 +444,10 @@ export default function ClassPage({ params }: { params: { id: string } }) {
         console.log('Adding file:', newActivity.files[0].name);
       }
       
-      console.log('Sending request to backend API: http://localhost:8222/api/v1/activities');
+      console.log('Sending request to backend API: http://82.29.168.17:8222/api/v1/activities');
       
       // Send the request with FormData
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -610,7 +610,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
           
           // First, try to get metadata directly
           try {
-            const metadataResponse = await fetch(`http://localhost:8222/api/v1/file-storage/${fileId}/metadata`, {
+            const metadataResponse = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
@@ -641,7 +641,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
           
           // Si no hay metadatos, intentar hacer HEAD al archivo para verificar el tipo MIME
           try {
-            const headResponse = await fetch(`http://localhost:8222/api/v1/file-storage/${fileId}?preview=true`, {
+            const headResponse = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/${fileId}?preview=true`, {
               method: 'HEAD',
               headers: {
                 'Authorization': `Bearer ${token}`
@@ -827,7 +827,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
         <iframe
           ref={iframeRef}
           key={`${fileId}-${retryCount}`}
-          src={`http://localhost:8222/api/v1/file-storage/${fileId}?preview=true`}
+          src={`http://82.29.168.17:8222/api/v1/file-storage/${fileId}?preview=true`}
           className="w-full h-[600px] border rounded"
           onLoad={() => setIsLoading(false)}
           onError={() => {
@@ -856,9 +856,9 @@ export default function ClassPage({ params }: { params: { id: string } }) {
   // Add a function to handle joining the meet
   const handleJoinMeet = () => {
     // Redirect to the LiveKit endpoint with classroom name and ID
-    window.location.href = `http://localhost:3001/rooms/${classDetails.name.replace(/\s+/g, '')}${id}`;
+    window.location.href = `http://82.29.168.17:3001/rooms/${classDetails.name.replace(/\s+/g, '')}${id}`;
     // Alternatively, if you want to use Next.js router:
-    // router.push(`http://localhost:3000/${classDetails.name.replace(/\s+/g, '')}${id}`);
+    // router.push(`http://82.29.168.17:3000/${classDetails.name.replace(/\s+/g, '')}${id}`);
   };
 
   // Modify the activities useEffect to also filter student responses once activities are loaded
@@ -929,7 +929,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
         }
         
         // Realizar la solicitud de eliminación
-        const response = await fetch(`http://localhost:8222/api/v1/classrooms/${id}`, {
+        const response = await fetch(`http://82.29.168.17:8222/api/v1/classrooms/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,

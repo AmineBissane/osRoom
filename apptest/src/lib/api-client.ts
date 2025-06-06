@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://localhost:8222/api/v1';
+const API_BASE_URL = 'http://82.29.168.17:8222/api/v1';
 
 interface FetchOptions extends RequestInit {
   skipAuthHeader?: boolean;

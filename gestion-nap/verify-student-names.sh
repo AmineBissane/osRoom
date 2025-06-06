@@ -3,7 +3,7 @@
 # Get an access token from Keycloak
 echo "Getting access token from Keycloak..."
 ACCESS_TOKEN=$(curl -s -X POST \
-  "http://localhost:8080/realms/osRoom/protocol/openid-connect/token" \
+  "http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=admin" \
   -d "password=admin" \
@@ -19,7 +19,7 @@ fi
 
 # First, make sure the classrooms service is working
 echo "Checking classrooms service..."
-CLASSROOMS_RESPONSE=$(curl -s "http://localhost:8000/api/v1/classrooms" \
+CLASSROOMS_RESPONSE=$(curl -s "http://82.29.168.17:8000/api/v1/classrooms" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 CLASSROOM_COUNT=$(echo "$CLASSROOMS_RESPONSE" | grep -o '"id"' | wc -l)
@@ -36,7 +36,7 @@ echo "Using classroom ID: $CLASSROOM_ID"
 
 # Check if students endpoint returns realistic names
 echo "Checking students from classrooms service..."
-STUDENTS_RESPONSE=$(curl -s "http://localhost:8000/api/v1/classrooms/$CLASSROOM_ID/students" \
+STUDENTS_RESPONSE=$(curl -s "http://82.29.168.17:8000/api/v1/classrooms/$CLASSROOM_ID/students" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 STUDENT_COUNT=$(echo "$STUDENTS_RESPONSE" | grep -o '"id"' | wc -l)
@@ -62,7 +62,7 @@ echo "First, clear any existing attendance records for this classroom..."
 # Generate new attendance records
 echo "Generating new attendance records for classroom $CLASSROOM_ID..."
 ATTENDANCE_RESPONSE=$(curl -s -X POST \
-  "http://localhost:8226/api/v1/asistencias/generate-for-classroom/$CLASSROOM_ID" \
+  "http://82.29.168.17:8226/api/v1/asistencias/generate-for-classroom/$CLASSROOM_ID" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json")
 

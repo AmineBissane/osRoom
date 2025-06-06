@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
     const classCategory = getClassCategoryFromToken(accessToken)
     
     // Build the URL based on whether we have a class category
-    let url = 'http://localhost:8222/api/v1/classrooms'
+    let url = 'http://82.29.168.17:8222/api/v1/classrooms'
     if (classCategory) {
-      url = `http://localhost:8222/api/v1/classrooms/category/${classCategory}`
+      url = `http://82.29.168.17:8222/api/v1/classrooms/category/${classCategory}`
       console.log(`Filtering classrooms for category: ${classCategory}`)
     }
     
@@ -96,9 +96,9 @@ export async function GET(request: NextRequest) {
         const newClassCategory = getClassCategoryFromToken(newTokens.access_token)
         
         // Build the URL based on whether we have a class category
-        let retryUrl = 'http://localhost:8222/api/v1/classrooms'
+        let retryUrl = 'http://82.29.168.17:8222/api/v1/classrooms'
         if (newClassCategory) {
-          retryUrl = `http://localhost:8222/api/v1/classrooms/category/${newClassCategory}`
+          retryUrl = `http://82.29.168.17:8222/api/v1/classrooms/category/${newClassCategory}`
           console.log(`Filtering classrooms for category: ${newClassCategory}`)
         }
         

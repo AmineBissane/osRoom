@@ -190,7 +190,7 @@ export default function Home() {
       // Para cada clase, obtener sus actividades
       for (const classroom of classrooms) {
         try {
-          const response = await fetch(`http://localhost:8222/api/v1/activities/classrooms/${classroom.id}`, {
+          const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classroom.id}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -263,7 +263,7 @@ export default function Home() {
       }
 
       // Use direct backend call instead of proxy API endpoint
-      const response = await fetch(`http://localhost:8222/api/v1/activities/classrooms/${classId}`, {
+      const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -311,7 +311,7 @@ export default function Home() {
       }
 
       // Use direct backend call instead of proxy API endpoint
-      const response = await fetch(`http://localhost:8222/api/v1/file-storage/download/${fileId}`, {
+      const response = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

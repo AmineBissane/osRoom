@@ -33,10 +33,10 @@ export async function GET(
     
     if (isUuid) {
       // Intentar con un endpoint que soporte UUIDs
-      firstAttemptUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/user/${params.studentId}`;
+      firstAttemptUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/user/${params.studentId}`;
     } else {
       // Usar el endpoint original para IDs numéricos
-      firstAttemptUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/student/${params.studentId}`;
+      firstAttemptUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/student/${params.studentId}`;
     }
     
     console.log(`First attempt URL: ${firstAttemptUrl}`);
@@ -65,8 +65,8 @@ export async function GET(
     
     // Segundo intento con el endpoint alternativo
     const secondAttemptUrl = isUuid 
-      ? `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/student/${params.studentId}`
-      : `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/user/${params.studentId}`;
+      ? `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/student/${params.studentId}`
+      : `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/user/${params.studentId}`;
     
     console.log(`Second attempt URL: ${secondAttemptUrl}`);
     

@@ -44,7 +44,7 @@ export async function GET(
     console.log('Using token:', accessToken.substring(0, 20) + '...')
 
     // Log the full URL for debugging
-    const apiUrl = `http://localhost:8222/api/v1/activities/classrooms/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/classrooms/${id}`
     console.log(`Making request to: ${apiUrl}`)
 
     const response = await fetch(apiUrl, {

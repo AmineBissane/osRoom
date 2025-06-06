@@ -81,7 +81,7 @@ export default function AssignmentsPage() {
             try {
               console.log(`Obteniendo actividades para la clase: ${classroom.id} - ${classroom.name}`);
               
-              const response = await fetch(`http://localhost:8222/api/v1/activities/classrooms/${classroom.id}`, {
+              const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classroom.id}`, {
                 headers: {
                   'Authorization': `Bearer ${token}`,
                   'Content-Type': 'application/json',
@@ -121,7 +121,7 @@ export default function AssignmentsPage() {
             allActivities.map(async (activity) => {
               try {
                 // Check if user has responded to this activity
-                const responseCheckUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${activity.id}/user/${userId}`;
+                const responseCheckUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activity.id}/user/${userId}`;
                 const responseCheck = await fetch(responseCheckUrl, {
                   headers: {
                     'Authorization': `Bearer ${token}`,

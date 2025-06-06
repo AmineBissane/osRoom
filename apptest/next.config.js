@@ -32,28 +32,28 @@ const nextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: 'http://localhost:8222/api/v1/:path*',
+        destination: 'http://82.29.168.17:8222/api/v1/:path*',
       },
       {
         source: '/api/activitiesresponses/grade/:id',
-        destination: 'http://localhost:8222/api/v1/activitiesresponses/:id/grade',
+        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/:id/grade',
       },
       {
         source: '/api/activitiesresponses/student/:studentId',
-        destination: 'http://localhost:8222/api/v1/activitiesresponses/student/:studentId',
+        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/student/:studentId',
       },
       {
         source: '/api/student-activities/:studentId/:activityId',
-        destination: 'http://localhost:8222/api/v1/activitiesresponses/activity/:activityId/student/:studentId',
+        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/activity/:activityId/student/:studentId',
       },
       {
         source: '/api/activities/:id',
-        destination: 'http://localhost:8222/api/v1/activities/:id',
+        destination: 'http://82.29.168.17:8222/api/v1/activities/:id',
       },
       // Add a catch-all rule for activitiesresponses routes
       {
         source: '/api/activitiesresponses/:path*',
-        destination: 'http://localhost:8222/api/v1/activitiesresponses/:path*',
+        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/:path*',
       }
     ]
   },

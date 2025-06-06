@@ -68,11 +68,11 @@ export async function GET(
     const classId = request.nextUrl.searchParams.get('classId');
     
     // Build the API URL
-    let apiUrl = `http://localhost:8222/api/v1/activities/student/${studentId}`;
+    let apiUrl = `http://82.29.168.17:8222/api/v1/activities/student/${studentId}`;
     
     // Add classId to query parameters if provided
     if (classId) {
-      apiUrl = `http://localhost:8222/api/v1/activities/student/${studentId}/class/${classId}`;
+      apiUrl = `http://82.29.168.17:8222/api/v1/activities/student/${studentId}/class/${classId}`;
       console.log(`Filtering by class ID: ${classId}`);
     }
     

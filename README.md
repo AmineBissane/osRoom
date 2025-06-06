@@ -147,11 +147,11 @@ Asegúrese de tener instalado lo siguiente:
    ```
 
 5. Acceda a los servicios:
-   - Servidor de Descubrimiento: http://localhost:8761
-   - API Gateway: http://localhost:8222
-   - Consola de Administración de Keycloak: http://localhost:8080
-   - Administrador de PostgreSQL: http://localhost:5050
-   - Zipkin: http://localhost:9411
+   - Servidor de Descubrimiento: http://82.29.168.17:8761
+   - API Gateway: http://82.29.168.17:8222
+   - Consola de Administración de Keycloak: http://82.29.168.17:8080
+   - Administrador de PostgreSQL: http://82.29.168.17:5050
+   - Zipkin: http://82.29.168.17:9411
 
 ### Variables de Entorno
 

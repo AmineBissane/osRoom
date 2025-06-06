@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         newFormData.append('file', formData.get('file') as File);
       }
       
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         newFormData.append('file', formData.get('file') as File);
       }
       
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         newFormData.append('file', formData.get('file') as File);
       }
       
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

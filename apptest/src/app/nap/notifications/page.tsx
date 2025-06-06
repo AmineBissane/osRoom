@@ -70,7 +70,7 @@ export default function NotificationsPage() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const data = await api.get<Notification[]>('http://localhost:8226/api/v1/notificaciones');
+      const data = await api.get<Notification[]>('http://82.29.168.17:8226/api/v1/notificaciones');
       setNotifications(data);
     } catch (error) {
       console.error('Error:', error);
@@ -82,7 +82,7 @@ export default function NotificationsPage() {
 
   const fetchUsers = async () => {
     try {
-      const data = await api.get<User[]>('http://localhost:8226/api/v1/users');
+      const data = await api.get<User[]>('http://82.29.168.17:8226/api/v1/users');
       setUsers(data);
     } catch (error) {
       console.error('Error:', error);
@@ -91,7 +91,7 @@ export default function NotificationsPage() {
 
   const handleCreateNotification = async () => {
     try {
-      await api.post('http://localhost:8226/api/v1/notificaciones', newNotification);
+      await api.post('http://82.29.168.17:8226/api/v1/notificaciones', newNotification);
       toast.success('Notificación enviada correctamente');
       setDialogOpen(false);
       setNewNotification({
@@ -108,7 +108,7 @@ export default function NotificationsPage() {
 
   const handleDeleteNotification = async (id: number) => {
     try {
-      await api.delete(`http://localhost:8226/api/v1/notificaciones/${id}`);
+      await api.delete(`http://82.29.168.17:8226/api/v1/notificaciones/${id}`);
       toast.success('Notificación eliminada correctamente');
       fetchNotifications();
     } catch (error) {
@@ -119,7 +119,7 @@ export default function NotificationsPage() {
 
   const markAsRead = async (id: number) => {
     try {
-      await api.put(`http://localhost:8226/api/v1/notificaciones/${id}/leer`, {});
+      await api.put(`http://82.29.168.17:8226/api/v1/notificaciones/${id}/leer`, {});
       setNotifications(notifications.map(notification => 
         notification.id === id ? { ...notification, leida: true } : notification
       ));

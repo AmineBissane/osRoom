@@ -64,7 +64,7 @@ export async function GET(
     console.log(`Fetching activity responses for student ID: ${studentId}`);
 
     // Make request to backend API
-    const apiUrl = `http://localhost:8222/api/v1/activitiesresponses/student/${studentId}`;
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/student/${studentId}`;
     console.log(`Making request to: ${apiUrl}`);
 
     try {
@@ -73,7 +73,7 @@ export async function GET(
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json',
-          'Origin': 'http://localhost:3000'
+          'Origin': 'http://82.29.168.17:3000'
         },
         credentials: 'include'
       });

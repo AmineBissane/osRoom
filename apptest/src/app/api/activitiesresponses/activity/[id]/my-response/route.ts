@@ -44,7 +44,7 @@ export async function GET(
     // Intentar primero el endpoint de búsqueda por UUID
     try {
       // Usar endpoint con path "user" para buscar por UUID en lugar de "student"
-      const userEndpointUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/user/${userId}`;
+      const userEndpointUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/user/${userId}`;
       console.log(`Trying UUID-based endpoint: ${userEndpointUrl}`);
       
       const userResponse = await fetch(userEndpointUrl, {
@@ -70,7 +70,7 @@ export async function GET(
     
     // Si el endpoint de UUID falló, intentar con my-responses que no requiere ID
     try {
-      const myResponsesUrl = `http://localhost:8222/api/v1/activitiesresponses/my-responses?activityId=${params.id}`;
+      const myResponsesUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/my-responses?activityId=${params.id}`;
       console.log(`Trying my-responses endpoint: ${myResponsesUrl}`);
       
       const myResponsesResponse = await fetch(myResponsesUrl, {
@@ -94,7 +94,7 @@ export async function GET(
     }
     
     // Como último recurso, intentar convertir el UUID a un ID numérico
-    const lastResortUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}/student/${userId}`;
+    const lastResortUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}/student/${userId}`;
     console.log(`Trying fallback student endpoint: ${lastResortUrl}`);
     
     const response = await fetch(lastResortUrl, {

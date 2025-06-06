@@ -42,7 +42,7 @@ if (file) {
 }
 
 // Send the request
-const response = await fetch('http://localhost:8222/api/v1/activities', {
+const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
   method: 'POST',
   headers: {
     'Authorization': \`Bearer \${token}\`
@@ -69,7 +69,7 @@ const payload = {
 };
 
 // Send the request
-const response = await fetch('http://localhost:8222/api/v1/activities', {
+const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
   method: 'POST',
   headers: {
     'Authorization': \`Bearer \${token}\`,

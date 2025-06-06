@@ -129,7 +129,7 @@ export default function CalendarPage() {
   const [calendarApi] = useState(() => {
     // Create a separate API instance for calendar requests that points to port 8222
     const api = axios.create({
-      baseURL: 'http://localhost:8222/api',
+      baseURL: 'http://82.29.168.17:8222/api',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -182,7 +182,7 @@ export default function CalendarPage() {
     if (typeof window !== 'undefined') {
       // Allow credentials and set proper headers
       calendarApi.defaults.withCredentials = true;
-      calendarApi.defaults.headers.common['Access-Control-Allow-Origin'] = 'http://localhost:3000';
+      calendarApi.defaults.headers.common['Access-Control-Allow-Origin'] = 'http://82.29.168.17:3000';
       calendarApi.defaults.headers.common['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
       calendarApi.defaults.headers.common['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
     }

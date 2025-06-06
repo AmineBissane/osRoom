@@ -22,7 +22,7 @@ export async function GET(
   
   try {
     // Intentar obtener todas las respuestas para esta actividad desde el backend
-    const backendUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}`;
+    const backendUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}`;
     console.log(`Making request to backend: ${backendUrl}`);
     
     const response = await fetch(backendUrl, {
@@ -36,7 +36,7 @@ export async function GET(
     
     if (!response.ok) {
       // Si el primer endpoint falla, intentar con un endpoint alternativo
-      const alternativeUrl = `http://localhost:8222/api/v1/activities/${params.id}/responses`;
+      const alternativeUrl = `http://82.29.168.17:8222/api/v1/activities/${params.id}/responses`;
       console.log(`Trying alternative backend endpoint: ${alternativeUrl}`);
       
       const alternativeResponse = await fetch(alternativeUrl, {

@@ -83,7 +83,7 @@ app:
     client-id: ${KEYCLOAK_CLIENT_ID:gestion-nap}
     client-secret: ${KEYCLOAK_CLIENT_SECRET:secret}
   services:
-    classrooms-url: ${CLASSROOMS_URL:http://localhost:8000}
+    classrooms-url: ${CLASSROOMS_URL:http://82.29.168.17:8000}
 
 feign:
   client:

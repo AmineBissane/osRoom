@@ -434,7 +434,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       // Intentar con user/userId primero (endpoint más específico)
       try {
-        const userUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`;
+        const userUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`;
         console.log('Consultando endpoint específico de usuario:', userUrl);
         
         const userResponse = await fetch(userUrl, {
@@ -476,7 +476,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       // Si no se encontró con user/userId, intentar con student/userId
       try {
-        const studentUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${activityId}/student/${userId}`;
+        const studentUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/student/${userId}`;
         console.log('Consultando endpoint de estudiante:', studentUrl);
         
         const studentResponse = await fetch(studentUrl, {
@@ -601,7 +601,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       // Build the URL with query parameters
-      const url = new URL('http://localhost:8222/api/v1/activitiesresponses/with-file');
+      const url = new URL('http://82.29.168.17:8222/api/v1/activitiesresponses/with-file');
       url.searchParams.append('activityId', params.id);
       url.searchParams.append('studentId', studentId.toString());
       url.searchParams.append('studentName', userName);
@@ -727,7 +727,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       // URL directa del backend
-      const backendUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}${preview ? '?preview=true' : ''}`;
+      const backendUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}${preview ? '?preview=true' : ''}`;
       
       // Crear un Blob a partir de la respuesta para generar una URL local
       const response = await fetch(backendUrl, {
@@ -798,7 +798,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           ?.split('=')[1];
           
         if (token) {
-          const directUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${params.id}`;
+          const directUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${params.id}`;
           console.log('Trying direct API call to fetch all responses:', directUrl);
           
           const directResponse = await fetch(directUrl, {
@@ -942,13 +942,13 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (token) {
         try {
           console.log('Intentando conexión directa al backend para guardar calificación');
-          const directResponse = await fetch(`http://localhost:8222/api/v1/activitiesresponses/${selectedResponse.id}/grade`, {
+          const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activitiesresponses/${selectedResponse.id}/grade`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'Origin': 'http://localhost:3000'
+              'Origin': 'http://82.29.168.17:3000'
             },
             body: JSON.stringify({ grade }),
             credentials: 'include'
@@ -1291,7 +1291,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           
           // First, try to get metadata directly
           try {
-            const metadataResponse = await fetch(`http://localhost:8222/api/v1/file-storage/${fileId}/metadata`, {
+            const metadataResponse = await fetch(`http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
@@ -1727,12 +1727,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           throw new Error('No se encontró el token de autenticación');
         }
         
-        const directResponse = await fetch(`http://localhost:8222/api/v1/activities/${params.id}`, {
+        const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${params.id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
-            'Origin': 'http://localhost:3000'
+            'Origin': 'http://82.29.168.17:3000'
           },
         });
         
@@ -1812,7 +1812,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       // Build the backend URL with query parameters
-      const url = new URL('http://localhost:8222/api/v1/activitiesresponses/with-file');
+      const url = new URL('http://82.29.168.17:8222/api/v1/activitiesresponses/with-file');
       url.searchParams.append('activityId', params.id);
       url.searchParams.append('studentId', userId);
       url.searchParams.append('studentName', userName);

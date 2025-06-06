@@ -34,7 +34,7 @@ export default function ArrayTestForm() {
       
       // 1. Try with classroomsIds as an array of integers
       try {
-        const response = await fetch('http://localhost:8222/api/v1/activities', {
+        const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -61,7 +61,7 @@ export default function ArrayTestForm() {
       
       // 2. Try with classroomIds (singular) as an array
       try {
-        const response = await fetch('http://localhost:8222/api/v1/activities', {
+        const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -97,7 +97,7 @@ export default function ArrayTestForm() {
         formData.append('endDate', testActivity.endDate);
         formData.append('classroomsIds[]', '2'); // Array notation in field name
         
-        const response = await fetch('http://localhost:8222/api/v1/activities', {
+        const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -126,7 +126,7 @@ export default function ArrayTestForm() {
         formData.append('endDate', testActivity.endDate);
         formData.append('classroomsIds', JSON.stringify([2])); // JSON string
         
-        const response = await fetch('http://localhost:8222/api/v1/activities', {
+        const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`

@@ -72,10 +72,10 @@ export async function GET(
     // Determine the correct endpoint based on what we're trying to fetch
     if (activityId && studentId) {
       // Fetching a specific student's submissions for a specific activity
-      apiUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${activityId}/student/${studentId}`;
+      apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/student/${studentId}`;
     } else if (studentId && !activityId) {
       // Fetching all activities for a student (fallback)
-      apiUrl = `http://localhost:8222/api/v1/activities/student/${studentId}`;
+      apiUrl = `http://82.29.168.17:8222/api/v1/activities/student/${studentId}`;
     } else {
       // Invalid request
       return NextResponse.json(

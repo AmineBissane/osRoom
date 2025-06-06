@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Build the URL with query parameters
-      const url = new URL('http://localhost:8222/api/v1/activitiesresponses/with-file');
+      const url = new URL('http://82.29.168.17:8222/api/v1/activitiesresponses/with-file');
       url.searchParams.append('activityId', activityId);
       
       // Add studentId if available, otherwise get it from the token

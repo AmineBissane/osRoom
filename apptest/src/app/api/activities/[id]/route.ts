@@ -46,7 +46,7 @@ export async function DELETE(
     console.log(`Deleting activity with ID: ${id} through Next.js API route`)
 
     // Make request to backend API with all necessary details
-    const apiUrl = `http://localhost:8222/api/v1/activities/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${id}`
     console.log(`Making request to: ${apiUrl}`)
     console.log(`Token (first 30 chars): ${accessToken.substring(0, 30)}...`)
 
@@ -56,7 +56,7 @@ export async function DELETE(
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Origin': 'http://localhost:3000'
+        'Origin': 'http://82.29.168.17:3000'
       },
       credentials: 'include'
     })
@@ -133,7 +133,7 @@ export async function GET(
     console.log(`Fetching activity with ID: ${id} through Next.js API route`)
 
     // Make request to backend API
-    const apiUrl = `http://localhost:8222/api/v1/activities/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${id}`
     
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -141,7 +141,7 @@ export async function GET(
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Origin': 'http://localhost:3000'
+        'Origin': 'http://82.29.168.17:3000'
       },
       credentials: 'include'
     })

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     console.log('Using token:', accessToken.substring(0, 20) + '...')
 
     // Upload the file to the backend
-    const apiUrl = 'http://localhost:8222/api/v1/file-storage/upload'
+    const apiUrl = 'http://82.29.168.17:8222/api/v1/file-storage/upload'
     console.log(`Making request to: ${apiUrl}`)
     
     const response = await fetch(apiUrl, {

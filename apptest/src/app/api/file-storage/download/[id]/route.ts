@@ -186,7 +186,7 @@ async function makeFileRequest(fileId: string, token: string, request: NextReque
 
   // For preview requests, pass the preview parameter to the backend 
   // only if our backend supports it directly
-  const apiUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}${isPreview ? '?preview=true' : ''}`;
+  const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}${isPreview ? '?preview=true' : ''}`;
   console.log(`Making request to: ${apiUrl}`);
 
   // Log all request headers for debugging

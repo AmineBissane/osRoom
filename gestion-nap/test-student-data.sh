@@ -3,7 +3,7 @@
 # Get an access token from Keycloak
 echo "Getting access token from Keycloak..."
 ACCESS_TOKEN=$(curl -s -X POST \
-  "http://localhost:8080/realms/osRoom/protocol/openid-connect/token" \
+  "http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=admin" \
   -d "password=admin" \
@@ -20,7 +20,7 @@ fi
 # 1. Check if classrooms service is available
 echo "Checking if classrooms service is available..."
 CLASSROOMS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
-  "http://localhost:8000/api/v1/classrooms" \
+  "http://82.29.168.17:8000/api/v1/classrooms" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 if [ "$CLASSROOMS_CHECK" != "200" ]; then
@@ -32,7 +32,7 @@ echo "Classrooms service is available!"
 
 # 2. List available classrooms
 echo "Listing available classrooms..."
-CLASSROOMS=$(curl -s "http://localhost:8000/api/v1/classrooms" \
+CLASSROOMS=$(curl -s "http://82.29.168.17:8000/api/v1/classrooms" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 # Extract classroom IDs and names
@@ -51,7 +51,7 @@ echo "Using classroom ID: $CLASSROOM_ID for testing"
 
 # 3. Check if the classroom has students
 echo "Checking if classroom has students..."
-STUDENTS=$(curl -s "http://localhost:8000/api/v1/classrooms/$CLASSROOM_ID/students" \
+STUDENTS=$(curl -s "http://82.29.168.17:8000/api/v1/classrooms/$CLASSROOM_ID/students" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 # Count the number of students
@@ -60,7 +60,7 @@ echo "Classroom has $STUDENT_COUNT students"
 
 # 4. Test getting attendance for this classroom
 echo "Testing attendance for classroom $CLASSROOM_ID..."
-ATTENDANCE=$(curl -s "http://localhost:8226/api/v1/asistencias?classroomId=$CLASSROOM_ID" \
+ATTENDANCE=$(curl -s "http://82.29.168.17:8226/api/v1/asistencias?classroomId=$CLASSROOM_ID" \
   -H "Authorization: Bearer $ACCESS_TOKEN")
 
 # Count attendance records
@@ -71,7 +71,7 @@ echo "Found $ATTENDANCE_COUNT attendance records"
 if [ "$ATTENDANCE_COUNT" -eq 0 ]; then
   echo "No attendance records found, generating new ones..."
   GENERATE_RESPONSE=$(curl -s -X POST \
-    "http://localhost:8226/api/v1/asistencias/generate-for-classroom/$CLASSROOM_ID" \
+    "http://82.29.168.17:8226/api/v1/asistencias/generate-for-classroom/$CLASSROOM_ID" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json")
   

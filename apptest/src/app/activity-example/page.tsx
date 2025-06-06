@@ -9,7 +9,7 @@ export default function ActivityExamplePage() {
       <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
         <h2 className="text-lg font-semibold text-yellow-800 mb-2">Important: Direct Backend Request</h2>
         <p className="text-yellow-700">
-          This form sends requests <strong>directly</strong> to the backend API at <code className="bg-yellow-100 px-1 rounded">http://localhost:8222/api/v1/activities</code> 
+          This form sends requests <strong>directly</strong> to the backend API at <code className="bg-yellow-100 px-1 rounded">http://82.29.168.17:8222/api/v1/activities</code> 
           instead of using the Next.js API routes.
         </p>
         <p className="text-yellow-700 mt-2">

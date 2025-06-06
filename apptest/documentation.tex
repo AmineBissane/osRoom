@@ -316,7 +316,7 @@ export async function refreshAccessToken() {
       throw new Error('No refresh token available')
     }
     
-    const response = await fetch('http://localhost:8222/api/v1/auth/refresh-token', {
+    const response = await fetch('http://82.29.168.17:8222/api/v1/auth/refresh-token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ export async function fetchClassroomsByCategory() {
       throw new Error('No authentication token available');
     }
     
-    const response = await fetch('http://localhost:8222/api/v1/classrooms', {
+    const response = await fetch('http://82.29.168.17:8222/api/v1/classrooms', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -933,7 +933,7 @@ export async function fetchActivitiesByClassroomId(classroomId: number) {
       throw new Error('No authentication token available');
     }
     
-    const response = await fetch(`http://localhost:8222/api/v1/activities/classrooms/${classroomId}`, {
+    const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classroomId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1079,7 +1079,7 @@ El método recomendado para desplegar la plataforma es utilizando Docker Compose
     \item Navegar al directorio del proyecto: \texttt{cd osRoom}
     \item Construir y levantar los contenedores: \texttt{docker-compose up -d --build}
     \item Verificar que todos los servicios estén funcionando: \texttt{docker-compose ps}
-    \item Acceder a la interfaz web de Eureka para comprobar el registro de servicios: \texttt{http://localhost:8761}
+    \item Acceder a la interfaz web de Eureka para comprobar el registro de servicios: \texttt{http://82.29.168.17:8761}
 \end{enumerate}
 
 \subsection{Configuración del frontend}
@@ -1090,8 +1090,8 @@ Para configurar y desplegar el frontend:
     \item Instalar dependencias: \texttt{npm install}
     \item Configurar las variables de entorno en \texttt{.env.local}:
     \begin{lstlisting}
-NEXT_PUBLIC_API_URL=http://localhost:8222/api/v1
-NEXT_PUBLIC_AUTH_URL=http://localhost:8222/api/v1/auth
+NEXT_PUBLIC_API_URL=http://82.29.168.17:8222/api/v1
+NEXT_PUBLIC_AUTH_URL=http://82.29.168.17:8222/api/v1/auth
     \end{lstlisting}
     \item Construir la aplicación: \texttt{npm run build}
     \item Iniciar el servidor: \texttt{npm run start}

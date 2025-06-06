@@ -7,7 +7,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Base URL
-BASE_URL="http://localhost:8226"
+BASE_URL="http://82.29.168.17:8226"
 
 echo -e "${YELLOW}Testing gestion-nap API...${NC}"
 

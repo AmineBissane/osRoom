@@ -17,7 +17,7 @@ export const fetchClassroomsByCategory = async () => {
     console.log('Fetching classrooms for category:', classCategory);
     
     // Make the request to the new endpoint
-    const response = await fetch(`http://localhost:8222/api/v1/classrooms/classroom/category/${classCategory}`, {
+    const response = await fetch(`http://82.29.168.17:8222/api/v1/classrooms/classroom/category/${classCategory}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

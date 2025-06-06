@@ -115,7 +115,7 @@ export default function GradesPage() {
 
   const fetchUsers = async () => {
     try {
-      const data = await api.get<User[]>('http://localhost:8226/api/v1/users')
+      const data = await api.get<User[]>('http://82.29.168.17:8226/api/v1/users')
         .catch(error => {
           console.error('Error fetching users:', error);
           return null;
@@ -178,7 +178,7 @@ export default function GradesPage() {
   const fetchClassrooms = async () => {
     try {
       // Try to get all classrooms first (this should work for all users)
-      let data = await api.get<Classroom[]>('http://localhost:8226/api/v1/classrooms')
+      let data = await api.get<Classroom[]>('http://82.29.168.17:8226/api/v1/classrooms')
         .catch(error => {
           console.error('Error fetching all classrooms:', error);
           return null;
@@ -192,7 +192,7 @@ export default function GradesPage() {
       }
       
       // If getting all classrooms failed, try my-classrooms endpoint
-      data = await api.get<Classroom[]>('http://localhost:8226/api/v1/classrooms/my-classrooms')
+      data = await api.get<Classroom[]>('http://82.29.168.17:8226/api/v1/classrooms/my-classrooms')
         .catch(error => {
           console.error('Error fetching my classrooms:', error);
           return null;
@@ -259,7 +259,7 @@ export default function GradesPage() {
     try {
       setLoading(true);
       
-      let url = 'http://localhost:8226/api/v1/calificaciones';
+      let url = 'http://82.29.168.17:8226/api/v1/calificaciones';
       const params = new URLSearchParams();
       
       if (selectedClassroom && selectedClassroom !== "all") {
@@ -340,7 +340,7 @@ export default function GradesPage() {
       const currentDate = new Date().toISOString().split('T')[0];
       
       // Include both old and new field names for better compatibility
-      await api.post('http://localhost:8226/api/v1/calificaciones', {
+      await api.post('http://82.29.168.17:8226/api/v1/calificaciones', {
         // New field format
         userId: newGrade.userId,
         userName: userFullName,
@@ -382,7 +382,7 @@ export default function GradesPage() {
       }
       
       const userIdToUse = userId || selectedUserForPDF;
-      const url = `http://localhost:8226/api/v1/calificaciones/pdf/${userIdToUse}`;
+      const url = `http://82.29.168.17:8226/api/v1/calificaciones/pdf/${userIdToUse}`;
       
       const toastId = toast.loading('Generando PDF...');
       
@@ -511,7 +511,7 @@ export default function GradesPage() {
         return;
       }
       
-      await api.delete(`http://localhost:8226/api/v1/calificaciones/${gradeId}`);
+      await api.delete(`http://82.29.168.17:8226/api/v1/calificaciones/${gradeId}`);
       toast.success('Calificación eliminada correctamente');
       fetchGrades();
     } catch (error) {

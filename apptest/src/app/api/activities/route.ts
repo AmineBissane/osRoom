@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     console.log('Using token:', accessToken.substring(0, 20) + '...')
 
     // Log the full URL for debugging
-    const apiUrl = `http://localhost:8222/api/v1/activities`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities`
     console.log(`Making request to: ${apiUrl}`)
 
     const response = await fetch(apiUrl, {
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
     console.log('Content-Type:', contentType);
     
     // Set the URL for the backend API - directly use the backend endpoint
-    const apiUrl = 'http://localhost:8222/api/v1/activities';
+    const apiUrl = 'http://82.29.168.17:8222/api/v1/activities';
     console.log(`Making direct request to backend: ${apiUrl}`);
 
     // Clone the request and modify it

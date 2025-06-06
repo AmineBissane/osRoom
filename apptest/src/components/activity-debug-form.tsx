@@ -55,7 +55,7 @@ export default function ActivityDebugForm() {
       console.log('Trying with JSON payload...');
       
       // Send directly to the backend API using JSON
-      const jsonResponse = await fetch('http://localhost:8222/api/v1/activities', {
+      const jsonResponse = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -130,7 +130,7 @@ export default function ActivityDebugForm() {
       }
 
       // Send the FormData request
-      const response = await fetch('http://localhost:8222/api/v1/activities', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/activities', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -378,7 +378,7 @@ export default function ActivityDebugForm() {
         )}
       </CardContent>
       <CardFooter className="flex justify-between text-sm text-muted-foreground">
-        <p className="text-red-500 font-semibold">Direct backend request to: http://localhost:8222/api/v1/activities</p>
+        <p className="text-red-500 font-semibold">Direct backend request to: http://82.29.168.17:8222/api/v1/activities</p>
       </CardFooter>
     </Card>
   )

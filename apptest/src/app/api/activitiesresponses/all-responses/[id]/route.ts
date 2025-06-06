@@ -82,7 +82,7 @@ export async function GET(
     */
 
     // Make request to backend API
-    const apiUrl = `http://localhost:8222/api/v1/activitiesresponses/activity/${id}/all`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${id}/all`
     console.log(`Making request to: ${apiUrl}`)
 
     const response = await fetch(apiUrl, {

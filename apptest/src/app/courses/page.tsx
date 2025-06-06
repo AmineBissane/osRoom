@@ -110,7 +110,7 @@ export default function CoursesPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:8222/api/v1/classrooms', {
+      const response = await fetch('http://82.29.168.17:8222/api/v1/classrooms', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -154,7 +154,7 @@ export default function CoursesPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8222/api/v1/classrooms/classroom/${classToDelete}`, {
+      const response = await fetch(`http://82.29.168.17:8222/api/v1/classrooms/classroom/${classToDelete}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

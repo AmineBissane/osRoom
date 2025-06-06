@@ -13,7 +13,7 @@ interface FetchOptions extends RequestInit {
 }
 
 // Define backend URL
-const BACKEND_URL = 'http://localhost:8222';
+const BACKEND_URL = 'http://82.29.168.17:8222';
 
 /**
  * Decode JWT token and extract payload
@@ -215,7 +215,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         // Special handling for grade endpoints
         if (url.includes('/activitiesresponses/grade/')) {
           const id = url.split('/').pop();
-          const directGradeUrl = `http://localhost:8222/api/v1/activitiesresponses/${id}/grade`;
+          const directGradeUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`;
           console.log(`Direct backend URL for grade endpoint: ${directGradeUrl}`);
           
           // Make direct request to backend
@@ -225,7 +225,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'Origin': 'http://localhost:3000'
+              'Origin': 'http://82.29.168.17:3000'
             },
             credentials: 'include'
           });
@@ -233,9 +233,9 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         
         // Standard URL transformations for other endpoints
         const backendUrl = url
-          .replace('/api/activities/', 'http://localhost:8222/api/v1/activities/')
-          .replace('/api/activitiesresponses/', 'http://localhost:8222/api/v1/activitiesresponses/')
-          .replace('/api/backend/', 'http://localhost:8222/api/v1/');
+          .replace('/api/activities/', 'http://82.29.168.17:8222/api/v1/activities/')
+          .replace('/api/activitiesresponses/', 'http://82.29.168.17:8222/api/v1/activitiesresponses/')
+          .replace('/api/backend/', 'http://82.29.168.17:8222/api/v1/');
         
         console.log(`Direct backend URL: ${backendUrl}`);
         
@@ -246,7 +246,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Origin': 'http://localhost:3000'
+            'Origin': 'http://82.29.168.17:3000'
           },
           credentials: 'include'
         });
@@ -289,7 +289,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         // Special handling for grade endpoints
         if (url.includes('/activitiesresponses/grade/')) {
           const id = url.split('/').pop();
-          const directGradeUrl = `http://localhost:8222/api/v1/activitiesresponses/${id}/grade`;
+          const directGradeUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`;
           console.log(`Direct backend URL for grade endpoint: ${directGradeUrl}`);
           
           return fetch(directGradeUrl, {
@@ -298,7 +298,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json',
-              'Origin': 'http://localhost:3000'
+              'Origin': 'http://82.29.168.17:3000'
             },
             credentials: 'include'
           });
@@ -306,9 +306,9 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         
         // Standard URL transformations for other endpoints
         const backendUrl = url
-          .replace('/api/activities/', 'http://localhost:8222/api/v1/activities/')
-          .replace('/api/activitiesresponses/', 'http://localhost:8222/api/v1/activitiesresponses/')
-          .replace('/api/backend/', 'http://localhost:8222/api/v1/');
+          .replace('/api/activities/', 'http://82.29.168.17:8222/api/v1/activities/')
+          .replace('/api/activitiesresponses/', 'http://82.29.168.17:8222/api/v1/activitiesresponses/')
+          .replace('/api/backend/', 'http://82.29.168.17:8222/api/v1/');
         
         console.log(`Direct backend URL on error fallback: ${backendUrl}`);
         
@@ -318,7 +318,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Origin': 'http://localhost:3000'
+            'Origin': 'http://82.29.168.17:3000'
           },
           credentials: 'include'
         });
