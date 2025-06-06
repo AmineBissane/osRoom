@@ -117,6 +117,9 @@ export async function refreshToken(refreshToken: string) {
     const result = await response.json();
     console.log('Token refreshed successfully');
     
+    // IMPORTANT: Do NOT modify the token here - return it as-is from Keycloak
+    // The token should be stored as-is, and Bearer prefix should be added only when making API requests
+    
     return result;
   } catch (error) {
     console.error('Error refreshing token:', error);

@@ -34,6 +34,17 @@ export function decodeJwt(token: string): any {
   }
 }
 
+// Helper function to clean token and ensure it doesn't have duplicate "Bearer" prefix
+function cleanToken(token: string): string {
+  if (!token) return '';
+  
+  // If token already starts with "Bearer", remove it first to avoid duplication
+  const cleanedToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+  
+  // Return token with single "Bearer" prefix
+  return `Bearer ${cleanedToken}`;
+}
+
 /**
  * Get current user ID from JWT token
  * @returns User ID from token sub claim or null if not available
@@ -139,8 +150,8 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
   if (!skipAuth) {
     if (token) {
       console.log('Adding Authorization header with token');
-      // Add Authorization header with Bearer token
-      headers.set('Authorization', `Bearer ${token}`);
+      // Add Authorization header with properly cleaned token
+      headers.set('Authorization', cleanToken(token));
     } else {
       console.warn('No access token found in cookies');
     }
@@ -193,7 +204,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
       // Check if the response contains a refreshed token
       // The backend API endpoint may have already refreshed the token and set new cookies
       const refreshedToken = Cookies.get('access_token');
-      if (refreshedToken && refreshedToken !== headers.get('Authorization')?.replace('Bearer ', '')) {
+      if (refreshedToken && refreshedToken !== token) {
         console.log('New token detected after 401, retrying with new token');
         
         // Retry the request with the new token
@@ -218,11 +229,11 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
           const directGradeUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`;
           console.log(`Direct backend URL for grade endpoint: ${directGradeUrl}`);
           
-          // Make direct request to backend
+          // Make direct request to backend with properly cleaned token
           return fetch(directGradeUrl, {
             ...fetchOptions,
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': cleanToken(token),
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'Origin': 'http://82.29.168.17:3000'
@@ -239,11 +250,11 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         
         console.log(`Direct backend URL: ${backendUrl}`);
         
-        // Make direct request to backend
+        // Make direct request to backend with properly cleaned token
         return fetch(backendUrl, {
           ...fetchOptions,
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': cleanToken(token),
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Origin': 'http://82.29.168.17:3000'
@@ -295,7 +306,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
           return fetch(directGradeUrl, {
             ...fetchOptions,
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': cleanToken(token),
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'Origin': 'http://82.29.168.17:3000'
@@ -315,7 +326,7 @@ export async function fetchWithAuth(url: string, options: FetchOptions = {}): Pr
         return fetch(backendUrl, {
           ...fetchOptions,
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': cleanToken(token),
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Origin': 'http://82.29.168.17:3000'

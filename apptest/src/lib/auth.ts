@@ -40,11 +40,6 @@ export async function authenticateWithKeycloak(username: string, password: strin
     tokenType: tokenData.token_type
   });
 
-  // Ensure the token is properly formatted
-  if (!tokenData.access_token.startsWith('Bearer ')) {
-    tokenData.access_token = `Bearer ${tokenData.access_token}`;
-  }
-
   return tokenData;
 }
 
@@ -79,11 +74,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
     tokenLength: tokenData.access_token?.length,
     tokenType: tokenData.token_type
   });
-
-  // Ensure the token is properly formatted
-  if (!tokenData.access_token.startsWith('Bearer ')) {
-    tokenData.access_token = `Bearer ${tokenData.access_token}`;
-  }
 
   return tokenData;
 }
