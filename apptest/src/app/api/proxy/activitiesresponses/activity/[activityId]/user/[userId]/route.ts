@@ -22,6 +22,22 @@ const logRequest = (info: any) => {
   }
 };
 
+// Add timeout for fetch requests
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 10000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
 export async function GET(
   request: Request,
   { params }: { params: { activityId: string; userId: string } }
@@ -64,94 +80,127 @@ export async function GET(
     logRequest({
       ...requestInfo,
       apiUrl,
-      hasToken: !!token
+      hasToken: !!token,
+      message: "Preparing to fetch from backend"
     });
     
-    // Make request to backend
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      cache: 'no-store'
-    });
-    
-    // Log response status
-    logRequest({
-      ...requestInfo,
-      responseStatus: response.status,
-      responseStatusText: response.statusText
-    });
-    
-    // Handle response errors
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        return NextResponse.json(
-          { error: 'Authentication failed' },
-          { status: response.status }
-        );
+    // Make request to backend with timeout
+    try {
+      // Make request to backend with timeout
+      const response = await fetchWithTimeout(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        cache: 'no-store'
+      }, 15000); // 15 second timeout
+      
+      // Log response status
+      logRequest({
+        ...requestInfo,
+        responseStatus: response.status,
+        responseStatusText: response.statusText,
+        responseHeaders: Object.fromEntries(response.headers.entries())
+      });
+      
+      // Handle response errors
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return NextResponse.json(
+            { error: 'Authentication failed' },
+            { status: response.status }
+          );
+        }
+        
+        // Return error but don't fail
+        logRequest({
+          ...requestInfo,
+          error: `Error response from backend: ${response.status} ${response.statusText}`,
+          message: "Returning empty array due to error response"
+        });
+        
+        return NextResponse.json([]);
       }
       
-      return NextResponse.json(
-        { error: `Error from backend: ${response.status} ${response.statusText}` },
-        { status: response.status }
-      );
-    }
-    
-    // Get response as text first
-    const responseText = await response.text();
-    
-    logRequest({
-      ...requestInfo,
-      responseTextLength: responseText.length,
-      responseText: responseText.length < 100 ? responseText : responseText.substring(0, 100) + (responseText.length > 100 ? '...' : '')
-    });
-    
-    // Handle empty responses explicitly
-    if (!responseText || responseText.trim() === '') {
+      // Get response as text first
+      const responseText = await response.text();
+      
+      // Log the raw response for debugging
       logRequest({
         ...requestInfo,
-        message: 'Empty response, returning empty array',
+        responseTextLength: responseText.length,
+        responseContentType: response.headers.get('content-type'),
+        responseRaw: responseText.substring(0, 300) // Log more of the response for debugging
       });
+      
+      // Handle empty responses explicitly
+      if (!responseText || responseText.trim() === '') {
+        logRequest({
+          ...requestInfo,
+          message: 'Empty response from backend, returning empty array',
+        });
+        return NextResponse.json([]);
+      }
+      
+      // Handle case where response might be invalid JSON but have content
+      if (responseText.trim() === '[]') {
+        logRequest({
+          ...requestInfo,
+          message: 'Response is empty array string, returning empty array',
+        });
+        return NextResponse.json([]);
+      }
+      
+      // Parse response as JSON, with fallback for empty responses
+      let data: any = [];
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (error) {
+        logRequest({
+          ...requestInfo,
+          error: 'Error parsing JSON response',
+          errorMessage: error instanceof Error ? error.message : String(error),
+          responseText: responseText.substring(0, 500) // Include more of the response for debugging
+        });
+        // Return empty array on parse error
+        return NextResponse.json([]);
+      }
+      
+      // Ensure we always return an array
+      if (!Array.isArray(data)) {
+        logRequest({
+          ...requestInfo,
+          warning: 'Response was not an array, returning empty array',
+          originalData: typeof data === 'object' ? JSON.stringify(data).substring(0, 200) : String(data)
+        });
+        data = [];
+      }
+      
+      // Log final response
+      logRequest({
+        ...requestInfo,
+        success: true,
+        dataLength: data.length
+      });
+      
+      // Return the response
+      return NextResponse.json(data);
+      
+    } catch (fetchError) {
+      // Handle fetch errors (timeout, network error, etc.)
+      logRequest({
+        ...requestInfo,
+        error: 'Fetch error',
+        errorMessage: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        errorType: fetchError instanceof Error ? fetchError.name : 'Unknown',
+        message: "Falling back to empty array due to fetch error"
+      });
+      
+      // Return empty array on fetch error
       return NextResponse.json([]);
     }
-    
-    // Parse response as JSON, with fallback for empty responses
-    let data: any = [];
-    
-    try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      logRequest({
-        ...requestInfo,
-        error: 'Error parsing JSON response',
-        errorMessage: error instanceof Error ? error.message : String(error),
-        responseText
-      });
-      // Return empty array on parse error
-      return NextResponse.json([]);
-    }
-    
-    // Ensure we always return an array
-    if (!Array.isArray(data)) {
-      logRequest({
-        ...requestInfo,
-        warning: 'Response was not an array, returning empty array',
-        originalData: data
-      });
-      data = [];
-    }
-    
-    // Log final response
-    logRequest({
-      ...requestInfo,
-      success: true,
-      dataLength: data.length
-    });
-    
-    // Return the response
-    return NextResponse.json(data);
     
   } catch (error) {
     // Log error
@@ -162,10 +211,7 @@ export async function GET(
       stack: error instanceof Error ? error.stack : undefined
     });
     
-    // Return error response
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    // Return empty array in case of any error
+    return NextResponse.json([]);
   }
 } 

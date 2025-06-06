@@ -667,7 +667,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           
           // If the API fails, use the fallback endpoint that always returns []
           serverLog('Using fallback endpoint', {});
-          const fallbackUrl = `/api/proxy/activitiesresponses/fallback?activityId=${activityId}&userId=${userId}`;
+          const fallbackUrl = `/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${userId}`;
           const fallbackResponse = await fetch(fallbackUrl);
           
           if (!fallbackResponse.ok) {
@@ -698,6 +698,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           serverLog('Empty response text - treating as empty array', {});
           setUserHasSubmitted(false);
           serverLog('Set userHasSubmitted to false (empty response)');
+          return false;
+        }
+        
+        // Handle cases where the response might be "[]" with whitespace or other variations
+        const trimmedText = responseText.trim();
+        if (trimmedText === '[]' || trimmedText === '[ ]' || /^\[\s*\]$/.test(trimmedText)) {
+          serverLog('Response is empty array - treating as no submissions', { responseText: trimmedText });
+          setUserHasSubmitted(false);
+          serverLog('Set userHasSubmitted to false (empty array)');
           return false;
         }
         
@@ -1315,43 +1324,25 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     );
   };
 
-  // Safety mechanism to ensure loading state doesn't get stuck
+  // Add safety timeout for loading state
   useEffect(() => {
+    let safetyTimeoutId: NodeJS.Timeout | null = null;
+    
     if (isLoading) {
-      serverLog('Safety timeout started for isLoading', { isLoading: true });
-      // Set a timeout to clear loading state after 15 seconds if it's still loading
-      const safetyTimer = setTimeout(() => {
-        console.log('Safety timeout: clearing loading state after timeout');
-        serverLog('Safety timeout triggered - clearing isLoading', { isLoading: true });
+      serverLog('Safety timeout started for isLoading', { isLoading });
+      safetyTimeoutId = setTimeout(() => {
+        serverLog('Safety timeout triggered - forcing isLoading to false', { isLoading });
         setIsLoading(false);
-      }, 15000);
-      
-      // Clear the timeout when loading state changes or component unmounts
-      return () => {
-        clearTimeout(safetyTimer);
+      }, 15000); // 15 second absolute maximum loading time
+    }
+    
+    return () => {
+      if (safetyTimeoutId) {
+        clearTimeout(safetyTimeoutId);
         serverLog('Safety timeout for isLoading cleared', { isLoading });
-      };
-    }
+      }
+    };
   }, [isLoading]);
-
-  // Safety mechanism for loadingResponses state
-  useEffect(() => {
-    if (loadingResponses) {
-      serverLog('Safety timeout started for loadingResponses', { loadingResponses: true });
-      // Set a timeout to clear loading state after 10 seconds if it's still loading
-      const safetyTimer = setTimeout(() => {
-        console.log('Safety timeout: clearing loadingResponses state after timeout');
-        serverLog('Safety timeout triggered - clearing loadingResponses', { loadingResponses: true });
-        setLoadingResponses(false);
-      }, 10000);
-      
-      // Clear the timeout when loading state changes or component unmounts
-      return () => {
-        clearTimeout(safetyTimer);
-        serverLog('Safety timeout for loadingResponses cleared', { loadingResponses });
-      };
-    }
-  }, [loadingResponses]);
 
   // Server-side debug logger function
   const serverLog = async (message: string, data: any = {}) => {
@@ -1775,7 +1766,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
               </a>
               <span>|</span>
               <a 
-                href={`/api/proxy/activitiesresponses/fallback?activityId=${activityId}&userId=${getCurrentUserId() || ''}`} 
+                href={`/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${getCurrentUserId() || ''}`} 
                 target="_blank" 
                 className="text-blue-500 hover:underline"
               >
