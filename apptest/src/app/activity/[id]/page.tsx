@@ -259,6 +259,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [gradeValue, setGradeValue] = useState('');
   const [viewingResponse, setViewingResponse] = useState<ActivityResponse | null>(null);
   const [isExpandedView, setIsExpandedView] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -596,6 +597,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       // Si ya sabemos que el usuario ha enviado una respuesta, no es necesario verificar de nuevo
       if (userHasSubmitted) {
         console.log('Ya sabemos que el usuario ha enviado una respuesta, no es necesario verificar de nuevo');
+        setIsLoading(false); // Ensure loading state is cleared
         return true;
       }
         
@@ -635,7 +637,10 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       try {
         // First try our normal endpoint with a timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          setIsLoading(false); // Ensure loading state is cleared on timeout
+        }, 5000);
         
         const userResponse = await fetch(cacheBustingUrl, {
           headers: {
@@ -653,11 +658,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           console.warn('La respuesta del servidor no fue exitosa, usando endpoint de respaldo');
           // Use the fallback endpoint directly
           const fallbackUrl = `/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${userId}`;
-          return await processSubmissionResponse(await fetch(fallbackUrl));
+          const result = await processSubmissionResponse(await fetch(fallbackUrl));
+          setIsLoading(false); // Ensure loading state is cleared
+          return result;
         }
         
         // Process the normal response
-        return await processSubmissionResponse(userResponse);
+        const result = await processSubmissionResponse(userResponse);
+        setIsLoading(false); // Ensure loading state is cleared
+        return result;
         
       } catch (fetchError) {
         console.error('Error en la petición fetch:', fetchError);
@@ -665,7 +674,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         try {
           const fallbackUrl = `/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${userId}`;
           const fallbackResponse = await fetch(fallbackUrl);
-          return await processSubmissionResponse(fallbackResponse);
+          const result = await processSubmissionResponse(fallbackResponse);
+          setIsLoading(false); // Ensure loading state is cleared
+          return result;
         } catch (fallbackError) {
           console.error('Error en la petición al endpoint de respaldo:', fallbackError);
           setUserHasSubmitted(false);
@@ -692,6 +703,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (!responseText || responseText.trim() === '') {
         console.log('Respuesta vacía, el usuario no ha enviado respuestas');
         setUserHasSubmitted(false);
+        // Reset loading states
+        setLoading(false);
+        setIsLoading(false);
         return false;
       }
       
@@ -700,6 +714,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (trimmedText === '[]' || trimmedText === '[ ]' || /^\[\s*\]$/.test(trimmedText)) {
         console.log('Respuesta es un array vacío, el usuario no ha enviado respuestas');
         setUserHasSubmitted(false);
+        // Reset loading states
+        setLoading(false);
+        setIsLoading(false);
         return false;
       }
       
@@ -736,15 +753,28 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         // Guardar en localStorage para persistencia
         saveSubmissionState();
         
+        // Reset loading states
+        setLoading(false);
+        setIsLoading(false);
         return true;
       } else {
         // Explicitly set to false if no submissions found
         console.log('El usuario no ha enviado ninguna respuesta');
         setUserHasSubmitted(false);
+        // Reset loading states
+        setLoading(false);
+        setIsLoading(false);
         return false;
       }
+    } catch (error) {
+      console.error('Error procesando respuesta:', error);
+      // Reset loading states
+      setLoading(false);
+      setIsLoading(false);
+      return false;
     } finally {
       // Always clear loading state when processing is done
+      setLoading(false);
       setIsLoading(false);
     }
   };
@@ -1294,7 +1324,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       safetyTimeoutId = setTimeout(() => {
         serverLog('Safety timeout triggered - forcing isLoading to false', { isLoading });
         setIsLoading(false);
-      }, 15000); // 15 second absolute maximum loading time
+      }, 15000);
     }
     
     return () => {
@@ -1365,7 +1395,51 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       params: params ? { id: params.id } : null,
       userId: getCurrentUserId(),
     });
+    
+    // Make sure loading states are reset after a brief delay to allow initial render
+    const resetTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+    
+    return () => {
+      clearTimeout(resetTimeout);
+    };
   }, []);
+
+  // Add useEffect to handle loading timeout
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    // If loading is true, set a timeout to show an error message after 15 seconds
+    if (loading) {
+      timeoutId = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 15000);
+    }
+    
+    // Clear the timeout when loading changes or component unmounts
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [loading]);
+
+  // Add a safety timeout to clear any loading states that might get stuck
+  useEffect(() => {
+    // Set a safety timeout to clear all loading states after 20 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (loading || isLoading) {
+        console.log('Safety timeout triggered to clear loading states');
+        setLoading(false);
+        setIsLoading(false);
+        setLoadingResponses(false);
+      }
+    }, 20000);
+    
+    // Clear the timeout when component unmounts
+    return () => {
+      clearTimeout(safetyTimeout);
+    };
+  }, [loading, isLoading]);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -1381,6 +1455,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           <div className="text-center">
             <div className="spinner mb-4"></div>
             <p>Cargando actividad...</p>
+            <button 
+              onClick={() => { 
+                setIsLoading(false);
+                setError(null); // Don't show error message, just stop loading
+              }}
+              className="mt-4 text-sm text-primary underline"
+            >
+              Continuar sin esperar
+            </button>
           </div>
         </div>
       ) : error ? (
@@ -1434,8 +1517,14 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             </div>
           
           {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+            <div className="flex flex-col justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+              <button 
+                onClick={() => setLoading(false)}
+                className="mt-2 text-sm text-primary underline"
+              >
+                Continuar sin esperar
+              </button>
             </div>
           ) : (
             <div className="space-y-6">
