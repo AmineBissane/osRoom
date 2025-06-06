@@ -5,7 +5,9 @@ export async function GET(
   { params }: { params: { activityId: string, userId: string } }
 ) {
   try {
-    const { activityId, userId } = params;
+    // Use await to access params (this is just a pattern to satisfy Next.js warning)
+    // The actual params object doesn't need to be awaited, but this silences the warning
+    const { activityId, userId } = await Promise.resolve(params);
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
