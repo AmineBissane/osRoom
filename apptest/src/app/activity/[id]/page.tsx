@@ -348,13 +348,66 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [activityId, setActivityId] = useState<string>('');
+  const [initializing, setInitializing] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
+    // Extract ID directly and set it immediately
     if (params && params.id) {
+      console.log("Setting activity ID from params:", params.id);
       setActivityId(params.id);
+    } else {
+      console.error("No activity ID found in params");
+      setError("No se pudo cargar la actividad: ID no encontrado");
     }
-  }, [params]);
+    setInitializing(false);
+  }, []);
+
+  // Check authentication status and ensure token validity
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('access_token='))
+        ?.split('=')[1];
+      
+      if (!token) {
+        console.error("No authentication token found");
+        setAuthError("No se encontró un token de autenticación válido. Por favor, inicie sesión nuevamente.");
+        
+        // Delay redirect slightly to ensure state updates
+        setTimeout(() => {
+          window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+        }, 100);
+        return;
+      }
+      
+      try {
+        // Verify token by making a simple API call
+        const response = await fetch('/api/auth/check', {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.error("Token validation failed");
+          setAuthError("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
+          
+          // Delay redirect slightly to ensure state updates
+          setTimeout(() => {
+            window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+          }, 100);
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   // Verificar localStorage para estado de entrega al cargar el componente
   useEffect(() => {
@@ -382,27 +435,42 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
 
   // Fetch activity data when activityId is available
   useEffect(() => {
-    if (activityId) {
+    if (activityId && !initializing) {
+      console.log("Fetching activity with ID:", activityId);
       fetchActivity();
       checkUserSubmission(activityId);
     }
-  }, [activityId]);
+  }, [activityId, initializing]);
 
   const fetchActivity = async () => {
+    if (!activityId) {
+      console.error("Attempted to fetch activity without ID");
+      return;
+    }
+
     try {
       setIsLoading(true);
       
       console.log('Fetching activity details for ID:', activityId);
       
-      // Use our proxy API endpoint
-      const response = await fetch(`/api/proxy/activities/${activityId}`, {
-          headers: {
+      // Add cache-busting timestamp
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/proxy/activities/${activityId}?_=${timestamp}`, {
+        headers: {
           'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        });
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
       
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          console.error("Authentication error:", response.status);
+          setAuthError("Error de autenticación. Por favor, inicie sesión nuevamente.");
+          window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+          return;
+        }
+        
         if (response.status === 404) {
           setError('Actividad no encontrada');
         } else {
@@ -814,258 +882,299 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   };
 
   return (
-    <StableContainer>
-    <div className="container py-6 space-y-6">
-        <div className="flex justify-between items-center mb-4">
-      <Button 
-        variant="outline" 
-        onClick={() => router.back()}
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Volver
-      </Button>
-      
-          {isTeacher && (
-            <Button 
-              variant="destructive" 
-              onClick={() => setShowDeleteConfirmation(true)}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
-              )}
-              Eliminar Actividad
-            </Button>
-          )}
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {initializing ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="spinner mb-4"></div>
+            <p>Inicializando...</p>
+          </div>
         </div>
-      
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+      ) : isLoading ? (
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="spinner mb-4"></div>
+            <p>Cargando actividad...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md" role="alert">
+          <p className="font-bold">Error</p>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.href = '/dashboard'} 
+            className="mt-4 bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded"
+          >
+            Volver al Dashboard
+          </button>
+        </div>
+      ) : authError ? (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md" role="alert">
+          <p className="font-bold">Error de Autenticación</p>
+          <p>{authError}</p>
+          <button 
+            onClick={() => window.location.href = '/login?from=' + encodeURIComponent(window.location.pathname)} 
+            className="mt-4 bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded"
+          >
+            Iniciar Sesión
+          </button>
         </div>
       ) : activity ? (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-2xl">{activity.name}</CardTitle>
-                  {activity.endDate && (
-                    <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Fecha límite: {format(activity.endDate, "PPP", { locale: es })}
-                      {activity.isExpired && (
-                        <Badge variant="destructive" className="ml-2">Expirado</Badge>
+        <StableContainer>
+        <div className="container py-6 space-y-6">
+            <div className="flex justify-between items-center mb-4">
+          <Button 
+            variant="outline" 
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver
+          </Button>
+          
+              {isTeacher && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setShowDeleteConfirmation(true)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Eliminar Actividad
+                </Button>
+              )}
+            </div>
+          
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-2xl">{activity.name}</CardTitle>
+                      {activity.endDate && (
+                        <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          Fecha límite: {format(activity.endDate, "PPP", { locale: es })}
+                          {activity.isExpired && (
+                            <Badge variant="destructive" className="ml-2">Expirado</Badge>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
-                
-                  <div className="flex items-center gap-2">
-                {userHasSubmitted && (
-                  <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
-                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                    Entregado
-                  </Badge>
-                )}
-                {submittedResponse?.grade !== undefined && submittedResponse?.grade !== null && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    Calificación: {submittedResponse.grade}/10
-                  </Badge>
-                )}
                     
-                    {isTeacher && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={handleViewResponses}
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Ver Respuestas
-                      </Button>
-                    )}
-                  </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-2">Descripción</h3>
-                <p>{activity.description}</p>
-              </div>
-              
-              {activity.fileId && (
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Material de la actividad</h3>
-                  <DocumentPreview fileId={activity.fileId} />
-                </div>
-              )}
-              
-              {/* Student response form section - redesigned with shadcn components */}
-              <div className="mt-8">
-                <Card className="border-primary/10">
-                  <CardHeader className="pb-3 border-b">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl">Enviar Respuesta</CardTitle>
+                    <div className="flex items-center gap-2">
                       {userHasSubmitted && (
                         <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                           Entregado
                         </Badge>
                       )}
-                      {activity?.isExpired && (
-                        <Badge variant="destructive" className="ml-2">
-                          <Clock className="h-3.5 w-3.5 mr-1" />
-                          Plazo vencido
+                      {submittedResponse?.grade !== undefined && submittedResponse?.grade !== null && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          Calificación: {submittedResponse.grade}/10
                         </Badge>
                       )}
+                      
+                      {isTeacher && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleViewResponses}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Ver Respuestas
+                        </Button>
+                      )}
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-5">
-                    {submissionError && (
-                      <div className="mb-6 p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md flex items-center">
-                        <XCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-                        <p>{submissionError}</p>
-                      </div>
-                    )}
-                    
-                    {userHasSubmitted ? (
-                      <div className="space-y-6">
-                        <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
-                          <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
-                          <p>Ya has enviado tu respuesta para esta actividad. No es posible realizar múltiples envíos.</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Descripción</h3>
+                    <p>{activity.description}</p>
+                  </div>
+                  
+                  {activity.fileId && (
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Material de la actividad</h3>
+                      <DocumentPreview fileId={activity.fileId} />
+                    </div>
+                  )}
+                  
+                  {/* Student response form section - redesigned with shadcn components */}
+                  <div className="mt-8">
+                    <Card className="border-primary/10">
+                      <CardHeader className="pb-3 border-b">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-xl">Enviar Respuesta</CardTitle>
+                          {userHasSubmitted && (
+                            <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                              Entregado
+                            </Badge>
+                          )}
+                          {activity?.isExpired && (
+                            <Badge variant="destructive" className="ml-2">
+                              <Clock className="h-3.5 w-3.5 mr-1" />
+                              Plazo vencido
+                            </Badge>
+                          )}
                         </div>
-                        
-                        {/* Display grade information if available */}
-                        {renderGradeInfo()}
-                      </div>
-                    ) : isSubmitted ? (
-                      <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
-                        <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
-                        <p>Ya has enviado tu respuesta para esta actividad.</p>
-                      </div>
-                    ) : (
-                      <form onSubmit={handleSubmitWithFile} className="space-y-6">
-                        {!getCurrentUserId() && (
-                          <div className="space-y-2">
-                            <Label htmlFor="studentId">ID de Estudiante</Label>
-                            <Input
-                              id="studentId"
-                              placeholder="Ingresa tu ID de estudiante"
-                              required
-                            />
+                      </CardHeader>
+                      <CardContent className="pt-5">
+                        {submissionError && (
+                          <div className="mb-6 p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md flex items-center">
+                            <XCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                            <p>{submissionError}</p>
                           </div>
                         )}
                         
-                        {!getCurrentUsername() && (
-                          <div className="space-y-2">
-                            <Label htmlFor="studentName">Nombre de Estudiante</Label>
-                            <Input
-                              id="studentName"
-                              placeholder="Ingresa tu nombre completo"
-                              required
-                            />
+                        {userHasSubmitted ? (
+                          <div className="space-y-6">
+                            <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
+                              <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
+                              <p>Ya has enviado tu respuesta para esta actividad. No es posible realizar múltiples envíos.</p>
+                            </div>
+                            
+                            {/* Display grade information if available */}
+                            {renderGradeInfo()}
                           </div>
-                        )}
-                        
-                        {/* File input with improved styling */}
-                        <div className="space-y-2">
-                          <Label htmlFor="file" className="block font-medium">
-                            Archivo de Respuesta <span className="text-destructive">*</span>
-                          </Label>
-                          <div className="border rounded-md p-4 bg-muted/30">
-                            <div className="flex flex-col items-center justify-center gap-2">
-                              <div className="p-2 rounded-full bg-primary/10">
-                                <Paperclip className="h-5 w-5 text-primary" />
+                        ) : isSubmitted ? (
+                          <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
+                            <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
+                            <p>Ya has enviado tu respuesta para esta actividad.</p>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleSubmitWithFile} className="space-y-6">
+                            {!getCurrentUserId() && (
+                              <div className="space-y-2">
+                                <Label htmlFor="studentId">ID de Estudiante</Label>
+                                <Input
+                                  id="studentId"
+                                  placeholder="Ingresa tu ID de estudiante"
+                                  required
+                                />
                               </div>
-                              <p className="text-sm text-muted-foreground text-center">
-                                Arrastra y suelta tu archivo aquí o
-                              </p>
-                              <Input
-                                type="file"
-                                id="file"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                className="max-w-xs"
-                                required
+                            )}
+                            
+                            {!getCurrentUsername() && (
+                              <div className="space-y-2">
+                                <Label htmlFor="studentName">Nombre de Estudiante</Label>
+                                <Input
+                                  id="studentName"
+                                  placeholder="Ingresa tu nombre completo"
+                                  required
+                                />
+                              </div>
+                            )}
+                            
+                            {/* File input with improved styling */}
+                            <div className="space-y-2">
+                              <Label htmlFor="file" className="block font-medium">
+                                Archivo de Respuesta <span className="text-destructive">*</span>
+                              </Label>
+                              <div className="border rounded-md p-4 bg-muted/30">
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <div className="p-2 rounded-full bg-primary/10">
+                                    <Paperclip className="h-5 w-5 text-primary" />
+                                  </div>
+                                  <p className="text-sm text-muted-foreground text-center">
+                                    Arrastra y suelta tu archivo aquí o
+                                  </p>
+                                  <Input
+                                    type="file"
+                                    id="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="max-w-xs"
+                                    required
+                                  />
+                                </div>
+                                
+                                {selectedFile && (
+                                  <div className="mt-4 p-3 border border-primary/20 bg-primary/5 rounded-md">
+                                    <div className="flex items-center">
+                                      <FileText className="h-4 w-4 mr-2 text-primary" />
+                                      <span className="text-sm font-medium">{selectedFile.name}</span>
+                                      <Badge variant="outline" className="ml-2">
+                                        {Math.round(selectedFile.size / 1024)} KB
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Note input with improved styling */}
+                            <div className="space-y-2">
+                              <Label htmlFor="note" className="font-medium">
+                                Nota (opcional)
+                              </Label>
+                              <Textarea
+                                id="note"
+                                value={note}
+                                onChange={(e) => setNote(e.target.value)}
+                                placeholder="Agrega notas o comentarios sobre tu entrega..."
+                                className="min-h-[120px] resize-none"
                               />
                             </div>
                             
-                            {selectedFile && (
-                              <div className="mt-4 p-3 border border-primary/20 bg-primary/5 rounded-md">
-                                <div className="flex items-center">
-                                  <FileText className="h-4 w-4 mr-2 text-primary" />
-                                  <span className="text-sm font-medium">{selectedFile.name}</span>
-                                  <Badge variant="outline" className="ml-2">
-                                    {Math.round(selectedFile.size / 1024)} KB
-                                  </Badge>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Note input with improved styling */}
-                        <div className="space-y-2">
-                          <Label htmlFor="note" className="font-medium">
-                            Nota (opcional)
-                          </Label>
-                          <Textarea
-                            id="note"
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Agrega notas o comentarios sobre tu entrega..."
-                            className="min-h-[120px] resize-none"
-                          />
-                        </div>
-                        
-                        {/* Submit button - disabled if user has already submitted */}
-                        <div className="pt-2">
-                          <Button
-                            type="submit"
-                            className="w-full"
-                            disabled={isSubmitting || activity?.isExpired || userHasSubmitted}
-                            variant={userHasSubmitted || activity?.isExpired ? "outline" : "default"}
-                          >
-                            {isSubmitting ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : userHasSubmitted ? (
-                              <>
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                Ya enviado
-                              </>
-                            ) : activity?.isExpired ? (
-                              <>
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Plazo vencido
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Enviar Respuesta
-                              </>
-                            )}
-                          </Button>
-                          
-                          {activity?.isExpired && (
-                            <p className="mt-2 text-sm text-destructive flex items-center justify-center">
-                              <Clock className="h-4 w-4 mr-1" />
-                              El plazo de entrega ha vencido
-                            </p>
-                          )}
-                        </div>
-                      </form>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </CardContent>
-          </Card>
-                      </div>
+                            {/* Submit button - disabled if user has already submitted */}
+                            <div className="pt-2">
+                              <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={isSubmitting || activity?.isExpired || userHasSubmitted}
+                                variant={userHasSubmitted || activity?.isExpired ? "outline" : "default"}
+                              >
+                                {isSubmitting ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Enviando...
+                                  </>
+                                ) : userHasSubmitted ? (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Ya enviado
+                                  </>
+                                ) : activity?.isExpired ? (
+                                  <>
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Plazo vencido
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="h-4 w-4 mr-2" />
+                                    Enviar Respuesta
+                                  </>
+                                )}
+                              </Button>
+                              
+                              {activity?.isExpired && (
+                                <p className="mt-2 text-sm text-destructive flex items-center justify-center">
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  El plazo de entrega ha vencido
+                                </p>
+                              )}
+                            </div>
+                          </form>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+        </StableContainer>
       ) : (
         <div className="py-12 text-center">
           <h2 className="text-2xl font-bold">Actividad no encontrada</h2>
@@ -1075,252 +1184,251 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-        {/* Dialog for viewing all student responses */}
-        <Dialog open={viewResponses} onOpenChange={setViewResponses}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Respuestas de Estudiantes</DialogTitle>
-              <DialogDescription>
-                Todas las respuestas para la actividad: {activity?.name}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {loadingResponses ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-                  </div>
-            ) : responses.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {responses.map((response) => (
-                  <ResponseCard
-                    key={response.id}
-                    response={response}
-                    onViewDetails={handleViewResponseDetail}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="py-8 text-center">
-                <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
-                </div>
-              )}
-          </DialogContent>
-        </Dialog>
+      {/* Dialog for viewing all student responses */}
+      <Dialog open={viewResponses} onOpenChange={setViewResponses}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Respuestas de Estudiantes</DialogTitle>
+            <DialogDescription>
+              Todas las respuestas para la actividad: {activity?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingResponses ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+            </div>
+          ) : responses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {responses.map((response) => (
+                <ResponseCard
+                  key={response.id}
+                  response={response}
+                  onViewDetails={handleViewResponseDetail}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Dialog for viewing response details */}
-        <Dialog 
-          open={isGrading} 
-          onOpenChange={(open) => {
-            console.log('Dialog onOpenChange called with:', open);
-            // Si estamos cerrando el diálogo, limpiamos estados
-            if (!open) {
-              console.log('Cerrando diálogo y limpiando estados');
-              // Primero cerrar el diálogo
-              setIsGrading(false);
-              
-              // Luego limpiar estados con un pequeño retraso
-              setTimeout(() => {
-                setSelectedResponse(null);
-                setGradeInput("");
-              }, 300); // Pequeño retraso para asegurar que la animación de cierre termine
-            } else {
-              // Si estamos abriendo, establecer isGrading
-              setIsGrading(true);
+      {/* Dialog for viewing response details */}
+      <Dialog 
+        open={isGrading} 
+        onOpenChange={(open) => {
+          console.log('Dialog onOpenChange called with:', open);
+          // Si estamos cerrando el diálogo, limpiamos estados
+          if (!open) {
+            console.log('Cerrando diálogo y limpiando estados');
+            // Primero cerrar el diálogo
+            setIsGrading(false);
+            
+            // Luego limpiar estados con un pequeño retraso
+            setTimeout(() => {
+              setSelectedResponse(null);
+              setGradeInput("");
+            }, 300); // Pequeño retraso para asegurar que la animación de cierre termine
+          } else {
+            // Si estamos abriendo, establecer isGrading
+            setIsGrading(true);
+          }
+        }}
+      >
+        <DialogContent 
+          className="max-w-5xl max-h-[90vh] overflow-y-auto"
+          onKeyDown={(e) => {
+            // Detener propagación de todos los eventos de teclado
+            e.stopPropagation();
+            // Prevenir comportamiento por defecto para teclas que podrían causar recarga
+            if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+              e.preventDefault();
+              console.log('Prevented reload key in dialog');
             }
           }}
+          onClick={(e) => {
+            // Detener propagación de clics para evitar interacciones no deseadas
+            e.stopPropagation();
+          }}
         >
-          <DialogContent 
-            className="max-w-5xl max-h-[90vh] overflow-y-auto"
-            onKeyDown={(e) => {
-              // Detener propagación de todos los eventos de teclado
-              e.stopPropagation();
-              // Prevenir comportamiento por defecto para teclas que podrían causar recarga
-              if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
-                e.preventDefault();
-                console.log('Prevented reload key in dialog');
-              }
-            }}
-            onClick={(e) => {
-              // Detener propagación de clics para evitar interacciones no deseadas
-              e.stopPropagation();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Detalle de Respuesta</DialogTitle>
-              <DialogDescription>
-                Respuesta de {selectedResponse?.studentName || ''}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedResponse && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Información del Estudiante</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{selectedResponse.studentName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>
-                            {formatDateTime(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            Entregado hace {timeSince(new Date(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created || Date.now()))}
-                          </span>
-                        </div>
+          <DialogHeader>
+            <DialogTitle>Detalle de Respuesta</DialogTitle>
+            <DialogDescription>
+              Respuesta de {selectedResponse?.studentName || ''}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedResponse && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Información del Estudiante</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{selectedResponse.studentName}</span>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          {formatDateTime(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          Entregado hace {timeSince(new Date(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created || Date.now()))}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Calificación</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {selectedResponse?.grade !== undefined && selectedResponse.grade !== null && (
-                          <div className="flex items-center justify-center">
-                            <div className="text-3xl font-bold">
-                              {selectedResponse.grade}
-                            </div>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Calificación</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {selectedResponse?.grade !== undefined && selectedResponse.grade !== null && (
+                        <div className="flex items-center justify-center">
+                          <div className="text-3xl font-bold">
+                            {selectedResponse.grade}
                           </div>
-                        )}
-                        
-                        <GradeInput
-                          value={gradeInput}
-                          onChange={handleGradeInputChange}
-                          onSave={saveGrade}
-                          disabled={false} /* Nunca deshabilitar para evitar problemas de estado */
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                
-                {/* Archivo entregado - Previsualización */}
-                {(selectedResponse.fileId || selectedResponse.responseFileId || selectedResponse.fileURL) && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center">
-                        <FileText className="h-5 w-5 mr-2 text-primary" />
-                        Archivo Entregado
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Botones de acción arriba para facilitar acceso */}
-                      <div className="flex flex-col sm:flex-row gap-2 justify-center mb-2">
-                        <Button
-                          variant="default"
-                          className="w-full sm:w-auto"
-                          onClick={() => {
-                            const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
-                            if (fileId) {
-                              window.open(getFileUrl(fileId, true), '_blank');
-                            }
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Ver en nueva pestaña
-                        </Button>
-                        
-                        <Button 
-                          variant="outline"
-                          className="w-full sm:w-auto"
-                          onClick={() => downloadFile(selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL)}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Descargar archivo
-                        </Button>
-                      </div>
+                        </div>
+                      )}
                       
-                      {/* Mostrar la previsualización */}
-                      <div className="border rounded-md overflow-hidden h-[400px]">
-                        <DocumentPreview 
-                          fileId={selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL}
-                          hideButtons={true}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                
-                {(selectedResponse.finalNote || selectedResponse.note) && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">Nota del Estudiante</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="p-3 bg-muted rounded-md">
-                        <p className="whitespace-pre-wrap">{selectedResponse.finalNote || selectedResponse.note}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      <GradeInput
+                        value={gradeInput}
+                        onChange={handleGradeInputChange}
+                        onSave={saveGrade}
+                        disabled={false} /* Nunca deshabilitar para evitar problemas de estado */
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-            
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={(e) => {
-                  e.stopPropagation(); // Prevenir propagación del evento
-                  console.log('Close button clicked');
-                  setIsGrading(false);
-                }}
-              >
-                Cerrar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              
+              {/* Archivo entregado - Previsualización */}
+              {(selectedResponse.fileId || selectedResponse.responseFileId || selectedResponse.fileURL) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center">
+                      <FileText className="h-5 w-5 mr-2 text-primary" />
+                      Archivo Entregado
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Botones de acción arriba para facilitar acceso */}
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center mb-2">
+                      <Button
+                        variant="default"
+                        className="w-full sm:w-auto"
+                        onClick={() => {
+                          const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
+                          if (fileId) {
+                            window.open(getFileUrl(fileId, true), '_blank');
+                          }
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver en nueva pestaña
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={() => downloadFile(selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Descargar archivo
+                      </Button>
+                    </div>
+                    
+                    {/* Mostrar la previsualización */}
+                    <div className="border rounded-md overflow-hidden h-[400px]">
+                      <DocumentPreview 
+                        fileId={selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL}
+                        hideButtons={true}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              {(selectedResponse.finalNote || selectedResponse.note) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Nota del Estudiante</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-3 bg-muted rounded-md">
+                      <p className="whitespace-pre-wrap">{selectedResponse.finalNote || selectedResponse.note}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevenir propagación del evento
+                console.log('Close button clicked');
+                setIsGrading(false);
+              }}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Delete confirmation dialog */}
-        <AlertDialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente la actividad
-                "{activity?.name}" y todas las respuestas asociadas.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                  // Prevent default to handle deletion manually
-                  e.preventDefault();
-                  handleDeleteActivity();
-                }}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Eliminando...
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Eliminar
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la actividad
+              "{activity?.name}" y todas las respuestas asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                // Prevent default to handle deletion manually
+                e.preventDefault();
+                handleDeleteActivity();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-    </StableContainer>
   );
 }
 
