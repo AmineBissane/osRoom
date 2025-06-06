@@ -256,7 +256,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [activityId, setActivityId] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [showEmergencyReset, setShowEmergencyReset] = useState(false);
+  const [gradeValue, setGradeValue] = useState('');
+  const [viewingResponse, setViewingResponse] = useState<ActivityResponse | null>(null);
+  const [isExpandedView, setIsExpandedView] = useState(false);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -1346,6 +1348,13 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
 
   // Server-side debug logger function
   const serverLog = async (message: string, data: any = {}) => {
+    // Only log critical errors in production
+    if (process.env.NODE_ENV !== 'development') {
+      if (!message.includes('Error') && !message.includes('error')) {
+        return;
+      }
+    }
+    
     try {
       await fetch('/api/debug', {
         method: 'POST',
@@ -1399,36 +1408,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     });
   }, []);
 
-  // Determine if loading is taking too long
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if (isLoading) {
-      timeoutId = setTimeout(() => {
-        setShowEmergencyReset(true);
-        serverLog("Emergency reset button shown", { isLoading });
-      }, 5000); // Show after 5 seconds of loading
-    } else {
-      setShowEmergencyReset(false);
-    }
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isLoading]);
-  
-  // Handle emergency reset
-  const handleEmergencyReset = () => {
-    serverLog("Emergency reset triggered by user", { 
-      isLoading, 
-      initializing,
-      activityId,
-      userHasSubmitted 
-    });
-    setIsLoading(false);
-    setError("La carga se ha reiniciado. Por favor, intenta recargar la página si sigues teniendo problemas.");
-  };
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {initializing ? (
@@ -1443,19 +1422,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           <div className="text-center">
             <div className="spinner mb-4"></div>
             <p>Cargando actividad...</p>
-            
-            {showEmergencyReset && (
-              <div className="mt-8 p-4 bg-red-100 border border-red-500 text-red-700 rounded-md">
-                <p className="font-bold">La carga está tardando más de lo esperado</p>
-                <p className="mb-4">Puedes reiniciar la carga si crees que hay un problema</p>
-                <button 
-                  onClick={handleEmergencyReset}
-                  className="bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-4 rounded"
-                >
-                  Reiniciar Carga
-                </button>
-              </div>
-            )}
           </div>
         </div>
       ) : error ? (
@@ -1737,7 +1703,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         </div>
         
         {/* Debug tools in development mode */}
-        {isDevelopment && (
+        {false && (
           <div className="mt-8 border-t pt-4 text-xs text-gray-500">
             <p>Debug Tools (Development Only)</p>
             <div className="flex gap-2 mt-2">
