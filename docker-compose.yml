@@ -39,24 +39,7 @@ services:
       timeout: 10s
       retries: 5
 
-  apptest:
-    build:
-      context: ./apptest
-      dockerfile: Dockerfile
-    container_name: apptest
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_KEYCLOAK_URL=http://keycloak:8080
-      - NEXT_PUBLIC_KEYCLOAK_REALM=osRoom
-      - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=frontend
-      - NEXT_PUBLIC_API_URL=http://gateway:8222
-    depends_on:
-      - keycloak
-      - gateway
-    networks:
-      - postgres
-    restart: unless-stopped
+ 
 
   livekit:
     image: livekit/livekit-server
