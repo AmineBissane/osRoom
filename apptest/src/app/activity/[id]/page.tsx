@@ -226,8 +226,8 @@ if (typeof window !== 'undefined') {
 }
 
 export default function ActivityPage({ params }: { params: { id: string } }) {
-  // Use React.use to properly unwrap the params promise
-  const resolvedParams = React.use(Promise.resolve(params));
+  // Access params directly since we're in a client component
+  // In the future this will need to be updated to use React.use with proper setup
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -260,15 +260,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   // Initialize activityId from params when component mounts
   useEffect(() => {
     // Extract ID directly and set it immediately
-    if (resolvedParams && resolvedParams.id) {
-      console.log("Setting activity ID from params:", resolvedParams.id);
-      setActivityId(resolvedParams.id);
+    if (params && params.id) {
+      console.log("Setting activity ID from params:", params.id);
+      setActivityId(params.id);
     } else {
       console.error("No activity ID found in params");
       setError("No se pudo cargar la actividad: ID no encontrado");
     }
     setInitializing(false);
-  }, [resolvedParams]);
+  }, [params]);
 
   // Check authentication status and ensure token validity
   useEffect(() => {
