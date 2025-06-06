@@ -177,11 +177,6 @@ export default function Home() {
     if (!classrooms.length) return;
     
     setLoadingUpcomingActivities(true);
-    const token = Cookies.get('access_token');
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
     
     try {
       // Crear un array para almacenar todas las actividades
@@ -190,9 +185,8 @@ export default function Home() {
       // Para cada clase, obtener sus actividades
       for (const classroom of classrooms) {
         try {
-          const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classroom.id}`, {
+          const response = await fetch(`/api/proxy/classrooms/${classroom.id}/activities`, {
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             }
@@ -256,17 +250,10 @@ export default function Home() {
   const handleViewActivities = async (classId: number) => {
     setLoadingActivities(true);
     try {
-      const token = Cookies.get('access_token')
-      if (!token) {
-        router.replace('/login')
-        return
-      }
-
-      // Use direct backend call instead of proxy API endpoint
-      const response = await fetch(`http://82.29.168.17:8222/api/v1/activities/classrooms/${classId}`, {
+      // Use our proxy API endpoint
+      const response = await fetch(`/api/proxy/classrooms/${classId}/activities`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }

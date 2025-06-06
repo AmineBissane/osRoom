@@ -16,10 +16,9 @@ export const fetchClassroomsByCategory = async () => {
     
     console.log('Fetching classrooms for category:', classCategory);
     
-    // Make the request to the new endpoint
-    const response = await fetch(`http://82.29.168.17:8222/api/v1/classrooms/classroom/category/${classCategory}`, {
+    // Use the proxy API endpoint instead of calling the gateway directly
+    const response = await fetch(`/api/proxy/classrooms/${classCategory}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
