@@ -4,8 +4,8 @@ import KeycloakProvider from "next-auth/providers/keycloak"
 const handler = NextAuth({
   providers: [
     KeycloakProvider({
-      clientId: process.env.KEYCLOAK_ID || "",
-      clientSecret: process.env.KEYCLOAK_SECRET || "",
+      clientId: process.env.KEYCLOAK_ID || "backendgateway",
+      clientSecret: process.env.KEYCLOAK_SECRET || "MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj",
       issuer: process.env.KEYCLOAK_ISSUER || "http://82.29.168.17:8080/realms/osRoom",
       authorization: { params: { scope: "openid email profile" } },
       token: {
