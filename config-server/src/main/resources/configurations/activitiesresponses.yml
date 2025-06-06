@@ -24,7 +24,7 @@ spring:
     show-sql: true
   flyway:
     baseline-on-migrate: true
-    repair-on-migrate: true
+    ignore-migration-patterns: V1,V2
 
 management:
   tracing:
