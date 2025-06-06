@@ -23,8 +23,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://keycloak:8080/realms/osRoom
-          jwk-set-uri: http://keycloak:8080/realms/osRoom/protocol/openid-connect/certs
+          issuer-uri: http://82.29.168.17:8080/realms/osRoom
+          jwk-set-uri: http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/certs
   application:
     name: gateway
 
