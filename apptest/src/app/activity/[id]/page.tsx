@@ -37,8 +37,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { use } from "react"
 import React from "react"
 import {
   AlertDialog,
@@ -329,7 +327,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   
   // Estados para manejar la carga de datos
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [responses, setResponses] = useState<ActivityResponse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -338,9 +335,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<ActivityResponse | null>(null);
   const [isGrading, setIsGrading] = useState(false);
-  const [grade, setGrade] = useState<number | null>(null);
   const [gradeInput, setGradeInput] = useState<string>("");
-  const [responseError, setResponseError] = useState<string | null>(null);
   const [userHasSubmitted, setUserHasSubmitted] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -897,11 +892,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     if (response && response.grade !== undefined && response.grade !== null) {
       const gradeValue = response.grade.toString();
       setGradeInput(gradeValue);
-      setGrade(response.grade);
       console.log('Inicializando calificación con valor existente:', gradeValue);
     } else {
       setGradeInput("");
-      setGrade(null);
       console.log('Inicializando calificación sin valor existente');
     }
     
@@ -1064,9 +1057,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   }, []);
 
   // Memo para estabilizar la función de cambio de gradeInput
-  const handleGradeInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation(); // Prevenir propagación del evento
-    setGrade(parseFloat(e.target.value));
+  const handleGradeInputChange = useCallback((value: string) => {
+    setGradeInput(value);
   }, []);
 
   // Inicialización: Cargar datos solo una vez
@@ -1125,7 +1117,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     loadInitialData();
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [/* vacío para asegurar que solo se ejecute una vez */]);
+  }, [params.id, checkUserSubmission]); // Dependencias: ID de actividad y función de verificación
   
   // Efecto para verificar el estado de entrega cuando la ventana recupera el foco
   useEffect(() => {
@@ -1150,7 +1142,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [params.id]); // Dependencia: ID de actividad
+  }, [params.id, checkUserSubmission]); // Dependencias: ID de actividad y función de verificación
   
   // Efecto para verificar periódicamente el estado de entrega
   useEffect(() => {
@@ -1271,8 +1263,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       // Primero, verificar si el fileId ya contiene información sobre el tipo de archivo
       if (typeof fileId === 'string') {
-        const lowerFileId = fileId.toLowerCase();
-        
         // Intentar extraer el nombre del archivo del fileId
         const possibleFileName = fileId.split('/').pop() || fileId;
         
@@ -2267,7 +2257,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
               // Luego limpiar estados con un pequeño retraso
               setTimeout(() => {
                 setSelectedResponse(null);
-                setGrade(null);
                 setGradeInput("");
               }, 300); // Pequeño retraso para asegurar que la animación de cierre termine
             } else {
@@ -2344,7 +2333,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                         
                         <GradeInput
                           value={gradeInput}
-                          onChange={setGradeInput}
+                          onChange={handleGradeInputChange}
                           onSave={handleSaveGrade}
                           disabled={false} /* Nunca deshabilitar para evitar problemas de estado */
                         />
