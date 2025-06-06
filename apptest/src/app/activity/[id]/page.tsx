@@ -592,12 +592,10 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const checkUserSubmission = async (activityId: string) => {
     try {
       console.log('Verificando si el usuario ya ha enviado una respuesta para la actividad:', activityId);
-      serverLog('Starting checkUserSubmission', { activityId });
       
       // Si ya sabemos que el usuario ha enviado una respuesta, no es necesario verificar de nuevo
       if (userHasSubmitted) {
         console.log('Ya sabemos que el usuario ha enviado una respuesta, no es necesario verificar de nuevo');
-        serverLog('User has already submitted - skipping check', { userHasSubmitted });
         return true;
       }
         
@@ -609,7 +607,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           
       if (!token) {
         console.error('No se encontró token al verificar el estado de entrega');
-        serverLog('No token found', { tokenExists: false });
+        // Set loading state to false
+        setIsLoading(false);
         return false;
       }
       
@@ -617,176 +616,136 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       const decodedToken = decodeJwt(token);
       if (!decodedToken || !decodedToken.sub) {
         console.error('No se pudo obtener el ID de usuario del token');
-        serverLog('Failed to decode token or get user ID', { decodedToken: !!decodedToken });
+        // Set loading state to false
+        setIsLoading(false);
         return false;
       }
       
       const userId = decodedToken.sub;
       console.log('Verificando entregas para el usuario:', userId);
-      serverLog('Checking submissions for user', { userId });
       
       // Use our proxy API endpoint to check user responses
       const userUrl = `/api/proxy/activitiesresponses/activity/${activityId}/user/${userId}`;
       console.log('Consultando endpoint para verificar entregas:', userUrl);
-      serverLog('Fetching user submissions', { url: userUrl });
       
       // Add cache-busting
       const timestamp = new Date().getTime();
       const cacheBustingUrl = `${userUrl}?_=${timestamp}`;
       
-      serverLog('Sending fetch request', { cacheBustingUrl });
-      
-      // To make the request even more robust, set a timeout
-      const timeoutPromise = new Promise<Response>((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout fetching user submissions')), 5000);
-      });
-      
       try {
-        // Use Promise.race to implement timeout
-        const userResponse = await Promise.race([
-          fetch(cacheBustingUrl, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate'
-            }
-          }),
-          timeoutPromise
-        ]) as Response;
+        // First try our normal endpoint with a timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         
-        serverLog('Received response', { 
-          status: userResponse.status,
-          ok: userResponse.ok,
-          statusText: userResponse.statusText
+        const userResponse = await fetch(cacheBustingUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          },
+          signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+        
+        // If the normal endpoint failed, try the fallback endpoint
         if (!userResponse.ok) {
-          console.error('Error en la respuesta del servidor:', userResponse.status, userResponse.statusText);
-          serverLog('Error in server response', { 
-            status: userResponse.status,
-            statusText: userResponse.statusText
-          });
-          
-          // If the API fails, use the fallback endpoint that always returns []
-          serverLog('Using fallback endpoint', {});
+          console.warn('La respuesta del servidor no fue exitosa, usando endpoint de respaldo');
+          // Use the fallback endpoint directly
           const fallbackUrl = `/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${userId}`;
-          const fallbackResponse = await fetch(fallbackUrl);
-          
-          if (!fallbackResponse.ok) {
-            // Even the fallback failed, give up
-            setIsLoading(false);
-            return false;
-          }
-          
-          // Use the fallback response instead
-          const fallbackData = await fallbackResponse.json();
-          serverLog('Received fallback data', { data: fallbackData });
-          
-          // Since the fallback always returns [], the user has not submitted
-          setUserHasSubmitted(false);
-          serverLog('Set userHasSubmitted to false (from fallback)');
-          return false;
+          return await processSubmissionResponse(await fetch(fallbackUrl));
         }
         
-        // Get the response as text first
-        const responseText = await userResponse.text();
-        serverLog('Raw response text', { 
-          textLength: responseText.length,
-          text: responseText.length < 100 ? responseText : responseText.substring(0, 100) + '...'
-        });
+        // Process the normal response
+        return await processSubmissionResponse(userResponse);
         
-        // Handle empty responses explicitly
-        if (!responseText || responseText.trim() === '') {
-          serverLog('Empty response text - treating as empty array', {});
-          setUserHasSubmitted(false);
-          serverLog('Set userHasSubmitted to false (empty response)');
-          return false;
-        }
-        
-        // Handle cases where the response might be "[]" with whitespace or other variations
-        const trimmedText = responseText.trim();
-        if (trimmedText === '[]' || trimmedText === '[ ]' || /^\[\s*\]$/.test(trimmedText)) {
-          serverLog('Response is empty array - treating as no submissions', { responseText: trimmedText });
-          setUserHasSubmitted(false);
-          serverLog('Set userHasSubmitted to false (empty array)');
-          return false;
-        }
-        
-        // Try to parse the response as JSON
-        let userData: any[] = [];
-        try {
-          userData = JSON.parse(responseText);
-          // Ensure it's an array
-          if (!Array.isArray(userData)) {
-            serverLog('Response is not an array', { userData });
-            userData = [];
-          }
-        } catch (parseError) {
-          serverLog('Error parsing JSON response', { 
-            error: parseError instanceof Error ? parseError.message : String(parseError),
-            responseText
-          });
-          userData = [];
-        }
-        
-        console.log('Respuesta del endpoint de usuario:', userData);
-        serverLog('User submission data', { 
-          dataLength: userData.length,
-          data: userData
-        });
-        
-        // Si hay alguna respuesta, el usuario ya ha enviado
-        const hasSubmitted = Array.isArray(userData) && userData.length > 0;
-        
-        if (hasSubmitted) {
-          console.log('El usuario ya ha enviado una respuesta');
-          serverLog('User has submitted', { hasSubmitted: true });
-          
-          // Actualizar estado global y mensaje
-          setUserHasSubmitted(true);
-          serverLog('Set userHasSubmitted to true');
-          
-          // Si hay una respuesta con calificación, guardarla en el estado
-          if (userData.length > 0 && userData[0].grade !== undefined) {
-            setSubmittedResponse(userData[0]);
-            serverLog('Set submitted response with grade', { grade: userData[0].grade });
-          }
-          
-          // Guardar en localStorage para persistencia
-          saveSubmissionState();
-          serverLog('Saved submission state to localStorage');
-          
-          return true;
-        } else {
-          // Explicitly set to false if no submissions found
-          console.log('El usuario no ha enviado ninguna respuesta');
-          serverLog('User has not submitted any responses', { hasSubmitted: false });
-          setUserHasSubmitted(false);
-          serverLog('Set userHasSubmitted to false');
-          return false;
-        }
       } catch (fetchError) {
         console.error('Error en la petición fetch:', fetchError);
-        serverLog('Fetch error in checkUserSubmission', { 
-          error: fetchError instanceof Error ? fetchError.message : String(fetchError)
-        });
-        
-        // If there's a timeout or network error, assume the user hasn't submitted
-        setUserHasSubmitted(false);
-        serverLog('Set userHasSubmitted to false due to fetch error');
-        
-        // Set loading state to false explicitly here to prevent infinite loading
-        setIsLoading(false);
-        return false;
+        // Use the fallback endpoint on any fetch error
+        try {
+          const fallbackUrl = `/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${userId}`;
+          const fallbackResponse = await fetch(fallbackUrl);
+          return await processSubmissionResponse(fallbackResponse);
+        } catch (fallbackError) {
+          console.error('Error en la petición al endpoint de respaldo:', fallbackError);
+          setUserHasSubmitted(false);
+          setIsLoading(false);
+          return false;
+        }
       }
     } catch (error) {
       console.error('Error al verificar entregas del usuario:', error);
-      serverLog('Error checking user submissions', { 
-        error: error instanceof Error ? error.message : String(error)
-      });
       // Set loading state to false explicitly here to prevent infinite loading
       setIsLoading(false);
+      setUserHasSubmitted(false);
       return false;
+    }
+  };
+
+  // Helper function to process submission responses
+  const processSubmissionResponse = async (response: Response): Promise<boolean> => {
+    try {
+      // Get the response as text first
+      const responseText = await response.text();
+      
+      // Handle empty responses explicitly
+      if (!responseText || responseText.trim() === '') {
+        console.log('Respuesta vacía, el usuario no ha enviado respuestas');
+        setUserHasSubmitted(false);
+        return false;
+      }
+      
+      // Handle cases where the response might be "[]" with whitespace or other variations
+      const trimmedText = responseText.trim();
+      if (trimmedText === '[]' || trimmedText === '[ ]' || /^\[\s*\]$/.test(trimmedText)) {
+        console.log('Respuesta es un array vacío, el usuario no ha enviado respuestas');
+        setUserHasSubmitted(false);
+        return false;
+      }
+      
+      // Try to parse the response as JSON
+      let userData: any[] = [];
+      try {
+        userData = JSON.parse(responseText);
+        // Ensure it's an array
+        if (!Array.isArray(userData)) {
+          console.warn('La respuesta no es un array:', userData);
+          userData = [];
+        }
+      } catch (parseError) {
+        console.error('Error al analizar respuesta JSON:', parseError);
+        userData = [];
+      }
+      
+      console.log('Respuesta del endpoint de usuario:', userData);
+      
+      // Si hay alguna respuesta, el usuario ya ha enviado
+      const hasSubmitted = Array.isArray(userData) && userData.length > 0;
+      
+      if (hasSubmitted) {
+        console.log('El usuario ya ha enviado una respuesta');
+        
+        // Actualizar estado global y mensaje
+        setUserHasSubmitted(true);
+        
+        // Si hay una respuesta con calificación, guardarla en el estado
+        if (userData.length > 0 && userData[0].grade !== undefined) {
+          setSubmittedResponse(userData[0]);
+        }
+        
+        // Guardar en localStorage para persistencia
+        saveSubmissionState();
+        
+        return true;
+      } else {
+        // Explicitly set to false if no submissions found
+        console.log('El usuario no ha enviado ninguna respuesta');
+        setUserHasSubmitted(false);
+        return false;
+      }
+    } finally {
+      // Always clear loading state when processing is done
+      setIsLoading(false);
     }
   };
   
