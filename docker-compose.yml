@@ -23,7 +23,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=alibou
       - EUREKA_CLIENT_SERVICE-URL_DEFAULTZONE=http://discovery:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_URL=http://82.29.168.17:8080
       - KEYCLOAK_REALM=osRoom
       - KEYCLOAK_CLIENT_ID=gestion-nap
       - KEYCLOAK_CLIENT_SECRET=secret
