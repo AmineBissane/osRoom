@@ -378,11 +378,11 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       // Use our proxy API endpoint
       const response = await fetch(`/api/proxy/activities/${params.id}`, {
-        headers: {
+          headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+            'Accept': 'application/json'
+          }
+        });
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -419,7 +419,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error('Error fetching activity:', error);
       setError('Error al cargar la actividad');
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -433,14 +433,14 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         console.log('Ya sabemos que el usuario ha enviado una respuesta, no es necesario verificar de nuevo');
         return true;
       }
-      
-      // Obtener el token
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_token='))
-        ?.split('=')[1];
         
-      if (!token) {
+        // Obtener el token
+        const token = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('access_token='))
+          ?.split('=')[1];
+          
+        if (!token) {
         console.error('No se encontró token al verificar el estado de entrega');
         return false;
       }

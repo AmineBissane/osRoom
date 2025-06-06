@@ -17,7 +17,7 @@ public class FileStorageClient {
 
     private final RestTemplate restTemplate;
 
-    private final String fileStorageUrl = "http://host.docker.internal:8030/api/v1/file-storage/upload";
+    private final String fileStorageUrl = "http://82.29.168.17:8030/api/v1/file-storage/upload";
 
     @Autowired
     public FileStorageClient(RestTemplateBuilder builder) {
