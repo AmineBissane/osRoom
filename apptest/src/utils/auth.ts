@@ -96,7 +96,7 @@ export async function refreshToken(refreshToken: string) {
     console.log('Sending refresh token request to Keycloak');
     
     const response = await fetch(
-      'http://localhost:8080/realms/osRoom/protocol/openid-connect/token',
+      'http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token',
       {
         method: 'POST',
         headers: {

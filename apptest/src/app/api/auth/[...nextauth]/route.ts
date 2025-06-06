@@ -6,7 +6,7 @@ const handler = NextAuth({
     KeycloakProvider({
       clientId: process.env.KEYCLOAK_ID || "",
       clientSecret: process.env.KEYCLOAK_SECRET || "",
-      issuer: process.env.KEYCLOAK_ISSUER || "http://localhost:8080/realms/osRoom",
+      issuer: process.env.KEYCLOAK_ISSUER || "http://82.29.168.17:8080/realms/osRoom",
       authorization: { params: { scope: "openid email profile" } },
       token: {
         params: {

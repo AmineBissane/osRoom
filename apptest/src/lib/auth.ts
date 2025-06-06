@@ -17,7 +17,7 @@ export async function authenticateWithKeycloak(username: string, password: strin
   });
 
   const response = await fetch(
-    'http://localhost:8080/realms/osRoom/protocol/openid-connect/token',
+    'http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token',
     {
       method: 'POST',
       headers: {
@@ -51,7 +51,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenRes
   });
 
   const response = await fetch(
-    'http://localhost:8080/realms/osRoom/protocol/openid-connect/token',
+    'http://82.29.168.17:8080/realms/osRoom/protocol/openid-connect/token',
     {
       method: 'POST',
       headers: {

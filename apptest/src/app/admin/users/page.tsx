@@ -71,7 +71,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = Cookies.get('access_token')
-      const response = await fetch('http://localhost:8080/admin/realms/osRoom/users', {
+      const response = await fetch('http://82.29.168.17:8080/admin/realms/osRoom/users', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -115,8 +115,8 @@ export default function UsersPage() {
 
     try {
       const url = editingUser 
-        ? `http://localhost:8080/admin/realms/osRoom/users/${editingUser.id}`
-        : 'http://localhost:8080/admin/realms/osRoom/users'
+        ? `http://82.29.168.17:8080/admin/realms/osRoom/users/${editingUser.id}`
+        : 'http://82.29.168.17:8080/admin/realms/osRoom/users'
       
       const response = await fetch(url, {
         method: editingUser ? 'PUT' : 'POST',
@@ -151,7 +151,7 @@ export default function UsersPage() {
 
     try {
       const token = Cookies.get('access_token')
-      const response = await fetch(`http://localhost:8080/admin/realms/osRoom/users/${userId}`, {
+      const response = await fetch(`http://82.29.168.17:8080/admin/realms/osRoom/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
