@@ -634,14 +634,23 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       
       serverLog('Sending fetch request', { cacheBustingUrl });
       
+      // To make the request even more robust, set a timeout
+      const timeoutPromise = new Promise<Response>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout fetching user submissions')), 5000);
+      });
+      
       try {
-        const userResponse = await fetch(cacheBustingUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        });
+        // Use Promise.race to implement timeout
+        const userResponse = await Promise.race([
+          fetch(cacheBustingUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
+            }
+          }),
+          timeoutPromise
+        ]) as Response;
         
         serverLog('Received response', { 
           status: userResponse.status,
@@ -655,8 +664,25 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             status: userResponse.status,
             statusText: userResponse.statusText
           });
-          // Set loading state to false explicitly here to prevent infinite loading
-          setIsLoading(false);
+          
+          // If the API fails, use the fallback endpoint that always returns []
+          serverLog('Using fallback endpoint', {});
+          const fallbackUrl = `/api/proxy/activitiesresponses/fallback?activityId=${activityId}&userId=${userId}`;
+          const fallbackResponse = await fetch(fallbackUrl);
+          
+          if (!fallbackResponse.ok) {
+            // Even the fallback failed, give up
+            setIsLoading(false);
+            return false;
+          }
+          
+          // Use the fallback response instead
+          const fallbackData = await fallbackResponse.json();
+          serverLog('Received fallback data', { data: fallbackData });
+          
+          // Since the fallback always returns [], the user has not submitted
+          setUserHasSubmitted(false);
+          serverLog('Set userHasSubmitted to false (from fallback)');
           return false;
         }
         
@@ -667,25 +693,29 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           text: responseText.length < 100 ? responseText : responseText.substring(0, 100) + '...'
         });
         
+        // Handle empty responses explicitly
+        if (!responseText || responseText.trim() === '') {
+          serverLog('Empty response text - treating as empty array', {});
+          setUserHasSubmitted(false);
+          serverLog('Set userHasSubmitted to false (empty response)');
+          return false;
+        }
+        
         // Try to parse the response as JSON
         let userData: any[] = [];
-        if (responseText.trim()) {
-          try {
-            userData = JSON.parse(responseText);
-            // Ensure it's an array
-            if (!Array.isArray(userData)) {
-              serverLog('Response is not an array', { userData });
-              userData = [];
-            }
-          } catch (parseError) {
-            serverLog('Error parsing JSON response', { 
-              error: parseError instanceof Error ? parseError.message : String(parseError),
-              responseText
-            });
+        try {
+          userData = JSON.parse(responseText);
+          // Ensure it's an array
+          if (!Array.isArray(userData)) {
+            serverLog('Response is not an array', { userData });
             userData = [];
           }
-        } else {
-          serverLog('Empty response text', {});
+        } catch (parseError) {
+          serverLog('Error parsing JSON response', { 
+            error: parseError instanceof Error ? parseError.message : String(parseError),
+            responseText
+          });
+          userData = [];
         }
         
         console.log('Respuesta del endpoint de usuario:', userData);
@@ -729,6 +759,11 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         serverLog('Fetch error in checkUserSubmission', { 
           error: fetchError instanceof Error ? fetchError.message : String(fetchError)
         });
+        
+        // If there's a timeout or network error, assume the user hasn't submitted
+        setUserHasSubmitted(false);
+        serverLog('Set userHasSubmitted to false due to fetch error');
+        
         // Set loading state to false explicitly here to prevent infinite loading
         setIsLoading(false);
         return false;
@@ -1729,6 +1764,22 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                 className="text-blue-500 hover:underline"
               >
                 Test API Response
+              </a>
+              <span>|</span>
+              <a 
+                href={`/api/debug/test-proxy?activityId=${activityId}&userId=${getCurrentUserId() || ''}`} 
+                target="_blank" 
+                className="text-blue-500 hover:underline"
+              >
+                Test Proxy
+              </a>
+              <span>|</span>
+              <a 
+                href={`/api/proxy/activitiesresponses/fallback?activityId=${activityId}&userId=${getCurrentUserId() || ''}`} 
+                target="_blank" 
+                className="text-blue-500 hover:underline"
+              >
+                Fallback API
               </a>
               <span>|</span>
               <button 

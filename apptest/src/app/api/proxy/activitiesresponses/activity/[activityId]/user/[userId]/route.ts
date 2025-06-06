@@ -1,61 +1,170 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+
+// Create logs directory if it doesn't exist
+const logDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
+
+const logFile = path.join(logDir, 'activity-responses-proxy.log');
+
+// Helper function to log information
+const logRequest = (info: any) => {
+  try {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${JSON.stringify(info)}\n`;
+    fs.appendFileSync(logFile, logEntry);
+    console.log(`[ACTIVITY RESPONSES PROXY] ${JSON.stringify(info)}`);
+  } catch (error) {
+    console.error('Error logging data:', error);
+  }
+};
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { activityId: string, userId: string } }
+  request: Request,
+  { params }: { params: { activityId: string; userId: string } }
 ) {
+  const { activityId, userId } = params;
+  
+  // Log request details
+  const requestInfo = {
+    type: 'ActivityResponses Proxy Request',
+    method: 'GET',
+    activityId,
+    userId,
+    timestamp: new Date().toISOString()
+  };
+  
+  logRequest(requestInfo);
+  
   try {
-    // Use await to access params (this is just a pattern to satisfy Next.js warning)
-    // The actual params object doesn't need to be awaited, but this silences the warning
-    const { activityId, userId } = await Promise.resolve(params);
-    
-    // Get the token from the request cookies
-    const token = request.cookies.get('access_token')?.value;
+    // Get the token from cookies header
+    const cookieHeader = request.headers.get('cookie') || '';
+    const tokenMatch = cookieHeader.match(/access_token=([^;]+)/);
+    const token = tokenMatch ? tokenMatch[1] : null;
     
     if (!token) {
+      logRequest({
+        ...requestInfo,
+        error: 'No token found in cookies',
+        cookieHeader: cookieHeader.substring(0, 50) + '...'
+      });
+      
       return NextResponse.json(
-        { error: 'No authentication token found' },
+        { error: 'Authentication required' },
         { status: 401 }
       );
     }
     
-    console.log(`Proxying request for activity response: activity=${activityId}, user=${userId}`);
-    
-    // Ensure token is properly formatted
-    const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    
-    // Make the request to the gateway
+    // Build the URL
     const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`;
-    console.log(`Making request to: ${apiUrl}`);
     
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': cleanToken,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
+    logRequest({
+      ...requestInfo,
+      apiUrl,
+      hasToken: !!token
     });
     
-    console.log(`Response status: ${response.status}`);
+    // Make request to backend
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      cache: 'no-store'
+    });
     
+    // Log response status
+    logRequest({
+      ...requestInfo,
+      responseStatus: response.status,
+      responseStatusText: response.statusText
+    });
+    
+    // Handle response errors
     if (!response.ok) {
-      // Forward the error status and message
+      if (response.status === 401 || response.status === 403) {
+        return NextResponse.json(
+          { error: 'Authentication failed' },
+          { status: response.status }
+        );
+      }
+      
       return NextResponse.json(
-        { error: `Gateway returned status: ${response.status}` },
+        { error: `Error from backend: ${response.status} ${response.statusText}` },
         { status: response.status }
       );
     }
     
-    // Get the response data
-    const data = await response.json();
+    // Get response as text first
+    const responseText = await response.text();
     
-    // Return the data
+    logRequest({
+      ...requestInfo,
+      responseTextLength: responseText.length,
+      responseText: responseText.length < 100 ? responseText : responseText.substring(0, 100) + (responseText.length > 100 ? '...' : '')
+    });
+    
+    // Handle empty responses explicitly
+    if (!responseText || responseText.trim() === '') {
+      logRequest({
+        ...requestInfo,
+        message: 'Empty response, returning empty array',
+      });
+      return NextResponse.json([]);
+    }
+    
+    // Parse response as JSON, with fallback for empty responses
+    let data: any = [];
+    
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      logRequest({
+        ...requestInfo,
+        error: 'Error parsing JSON response',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        responseText
+      });
+      // Return empty array on parse error
+      return NextResponse.json([]);
+    }
+    
+    // Ensure we always return an array
+    if (!Array.isArray(data)) {
+      logRequest({
+        ...requestInfo,
+        warning: 'Response was not an array, returning empty array',
+        originalData: data
+      });
+      data = [];
+    }
+    
+    // Log final response
+    logRequest({
+      ...requestInfo,
+      success: true,
+      dataLength: data.length
+    });
+    
+    // Return the response
     return NextResponse.json(data);
+    
   } catch (error) {
-    console.error('Proxy error:', error);
+    // Log error
+    logRequest({
+      ...requestInfo,
+      error: 'Exception in proxy handler',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    // Return error response
     return NextResponse.json(
-      { error: 'Failed to fetch activity response from gateway' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
