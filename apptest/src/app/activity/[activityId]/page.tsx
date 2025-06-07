@@ -30,7 +30,7 @@ import { fetchWithAuth, getCurrentUsername } from '@/utils/fetchWithAuth'
 import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PDFViewer from '@/components/PDFViewer'
 import FileDownloader from '@/components/FileDownloader'
@@ -256,6 +256,10 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [loadingResponses, setLoadingResponses] = useState(true);
   const [selectedResponse, setSelectedResponse] = useState<ActivityResponse | null>(null);
   const [viewResponseDetail, setViewResponseDetail] = useState(false);
+  const [showGradeForm, setShowGradeForm] = useState(false);
+  const [gradeValue, setGradeValue] = useState<string>('');
+  const [submittingGrade, setSubmittingGrade] = useState(false);
+  const [isTeacher, setIsTeacher] = useState(false);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -977,12 +981,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
   // Function to view a specific response detail
   const handleViewResponseDetail = (response: ActivityResponse) => {
+    console.log('Viewing response detail:', response);
+    // Log the response file ID specifically to debug
+    console.log('Response file ID:', response.responseFileId);
     setSelectedResponse(response);
     setViewResponseDetail(true);
   };
-
-  // Function to handle grade input change
-  const handleGradeInputChange = () => {};
 
   // Function to save a grade for a response
   const saveGrade = () => {};
@@ -1557,6 +1561,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
   // Direct document preview component for response details dialog
   const DirectDocumentPreview = React.memo(({ fileId }: { fileId: string | undefined }) => {
+    console.log('DirectDocumentPreview called with fileId:', fileId);
+    
     if (!fileId) {
       return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     }
@@ -1690,6 +1696,68 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       clearTimeout(safetyTimeout);
     };
   }, [loading, isLoading]);
+
+  // Function to handle grade input change
+  const handleGradeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGradeValue(e.target.value);
+  };
+
+  // Function to submit a grade
+  const handleGradeSubmit = async (responseId: string | number | undefined) => {
+    if (!responseId) {
+      toast.error('No se pudo identificar la respuesta');
+      return;
+    }
+    
+    if (!gradeValue || isNaN(parseFloat(gradeValue))) {
+      toast.error('Por favor ingrese una calificación válida');
+      return;
+    }
+    
+    const gradeNum = parseFloat(gradeValue);
+    if (gradeNum < 0 || gradeNum > 10) {
+      toast.error('La calificación debe estar entre 0 y 10');
+      return;
+    }
+    
+    setSubmittingGrade(true);
+    
+    try {
+      // Call your API to save the grade
+      const response = await fetch(`/api/proxy/activitiesresponses/${responseId}/grade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ grade: gradeNum })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      
+      // Update the selected response with the new grade
+      if (selectedResponse) {
+        setSelectedResponse({
+          ...selectedResponse,
+          grade: gradeNum
+        });
+      }
+      
+      toast.success('Calificación guardada correctamente');
+      setShowGradeForm(false);
+      
+      // Refresh responses list if we're viewing them
+      if (viewResponses) {
+        fetchAllResponses();
+      }
+    } catch (error) {
+      console.error('Error al guardar la calificación:', error);
+      toast.error('Error al guardar la calificación');
+    } finally {
+      setSubmittingGrade(false);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -2025,50 +2093,125 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
       {/* Dialog for viewing response details */}
       <Dialog open={viewResponseDetail} onOpenChange={setViewResponseDetail}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Detalles de la Respuesta</DialogTitle>
+            <DialogTitle>Detalles de Respuesta</DialogTitle>
             <DialogDescription>
-              Respuesta de {selectedResponse?.studentName}
+              Respuesta de {selectedResponse?.studentName || 'estudiante'} a la actividad
             </DialogDescription>
           </DialogHeader>
           
-          {selectedResponse && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium">Fecha de Envío</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDateTime(selectedResponse.submissionDate)}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Calificación</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedResponse.grade !== undefined && selectedResponse.grade !== null 
-                      ? `${selectedResponse.grade}/10`
-                      : 'Sin calificar'}
-                  </p>
-                </div>
+          <div className="space-y-4">
+            {/* Student info */}
+            <div className="border rounded p-4">
+              <h3 className="font-medium mb-2">Información del estudiante</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Nombre:</div>
+                <div>{selectedResponse?.studentName}</div>
+                <div>Fecha de envío:</div>
+                <div>{selectedResponse?.submissionDate && formatDateTime(selectedResponse.submissionDate)}</div>
               </div>
-              
-              {selectedResponse.note && (
-                <div>
-                  <h4 className="font-medium">Nota del Estudiante</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {selectedResponse.note}
-                  </p>
-                </div>
-              )}
-              
-              {selectedResponse.responseFileId && (
-                <div>
-                  <h4 className="font-medium">Archivo Adjunto</h4>
+            </div>
+            
+            {/* Note */}
+            {selectedResponse?.finalNote && (
+              <div className="border rounded p-4">
+                <h3 className="font-medium mb-2">Nota del estudiante</h3>
+                <p className="text-sm whitespace-pre-wrap">{selectedResponse.finalNote}</p>
+              </div>
+            )}
+            
+            {/* File preview */}
+            <div className="border rounded p-4">
+              <h3 className="font-medium mb-2">Archivo enviado</h3>
+              {selectedResponse?.responseFileId ? (
+                <>
+                  <div className="mb-3 flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => downloadFile(selectedResponse.responseFileId)}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Descargar archivo
+                    </Button>
+                  </div>
                   <DirectDocumentPreview fileId={selectedResponse.responseFileId} />
-                </div>
+                </>
+              ) : (
+                <div className="text-gray-500 p-4">No hay archivo disponible</div>
               )}
             </div>
-          )}
+            
+            {/* Grade form */}
+            {isTeacher && (
+              <div className="border rounded p-4">
+                <h3 className="font-medium mb-2">Calificación</h3>
+                {selectedResponse?.grade !== undefined && selectedResponse?.grade !== null ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">Calificación actual: </span>
+                      <span className="text-lg">{selectedResponse.grade}</span>
+                    </div>
+                    <Button onClick={() => setShowGradeForm(true)} variant="outline" size="sm">
+                      Modificar calificación
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    {!showGradeForm ? (
+                      <Button onClick={() => setShowGradeForm(true)} variant="default" size="sm">
+                        Calificar respuesta
+                      </Button>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-2">
+                          <Input 
+                            type="number" 
+                            placeholder="Calificación (0-10)" 
+                            className="w-40"
+                            min={0}
+                            max={10}
+                            step={0.1}
+                            value={gradeValue}
+                            onChange={handleGradeInputChange}
+                          />
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => handleGradeSubmit(selectedResponse?.id)}
+                            disabled={submittingGrade}
+                          >
+                            {submittingGrade ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Guardando...
+                              </>
+                            ) : (
+                              'Guardar calificación'
+                            )}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowGradeForm(false)}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewResponseDetail(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
