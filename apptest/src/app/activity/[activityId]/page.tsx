@@ -985,11 +985,17 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
   // DocumentPreview component to preview files
   const DocumentPreview = ({ fileId, hideButtons = false }: { fileId: string | undefined, hideButtons?: boolean }) => {
-    const [previewUrl, setPreviewUrl] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [fileType, setFileType] = useState<string | null>(null);
     const [textContent, setTextContent] = useState<string | null>(null);
+    
+    // Get the access token from cookies
+    const getToken = () => {
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('access_token='));
+      return tokenCookie ? tokenCookie.split('=')[1] : null;
+    };
     
     useEffect(() => {
       const loadPreview = async () => {
@@ -999,48 +1005,57 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // First get file metadata to determine type
-          const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
-          if (metadataResponse.ok) {
-            const metadata = await metadataResponse.json();
-            setFileType(metadata.contentType);
-            
-            // Check if it's a text file
-            const isTextFile = 
-              metadata.contentType?.startsWith('text/') || 
-              metadata.contentType === 'application/json' ||
-              metadata.contentType === 'application/javascript' ||
-              metadata.contentType === 'application/xml' ||
-              metadata.contentType === 'application/x-yaml';
-            
-            if (isTextFile) {
-              // For text files, fetch the content directly
-              console.log('Fetching text file content');
-              const textResponse = await fetch(`/api/proxy/file-storage/download/${fileId}?preview=true`);
-              if (textResponse.ok) {
-                const text = await textResponse.text();
-                setTextContent(text);
-                console.log('Text content loaded successfully');
-              } else {
-                console.error('Failed to load text content:', textResponse.status);
-                setError(`Error loading text content: ${textResponse.status}`);
-              }
-            } else {
-              // For non-text files, use the preview URL
-              setPreviewUrl(`/api/proxy/file-storage/download/${fileId}?preview=true`);
-              console.log('Non-text file, using preview URL');
-            }
+          // Get the token
+          const token = getToken();
+          if (!token) {
+            throw new Error('No authentication token found');
+          }
+          
+          // Create direct API URL
+          const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+          
+          // Make the API call with the token
+          const response = await fetch(apiUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': '*/*',
+            },
+            credentials: 'include',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API returned status: ${response.status}`);
+          }
+          
+          // Get the content type
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          setFileType(contentType);
+          
+          // Handle different file types
+          if (contentType.startsWith('text/') || 
+              contentType === 'application/json' ||
+              contentType === 'application/javascript' ||
+              contentType === 'application/xml' ||
+              contentType === 'application/x-yaml') {
+            // For text files, get the text content
+            const text = await response.text();
+            setTextContent(text);
+          } else if (contentType.startsWith('image/')) {
+            // For images, create a blob URL
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            setTextContent(url);
           } else {
-            console.error('Failed to load metadata:', metadataResponse.status);
-            setError(`Error loading metadata: ${metadataResponse.status}`);
-            // Fallback to direct preview URL
-            setPreviewUrl(`/api/proxy/file-storage/download/${fileId}?preview=true`);
+            // For other files, create a blob URL
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            setTextContent(url);
           }
           
           setLoading(false);
         } catch (err) {
           console.error('Error loading preview:', err);
-          setError('No se pudo cargar la vista previa');
+          setError(`No se pudo cargar la vista previa: ${err instanceof Error ? err.message : 'Error desconocido'}`);
           setLoading(false);
         }
       };
@@ -1062,8 +1077,16 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         return <div className="text-red-500 p-4">{error}</div>;
       }
       
+      if (!textContent) {
+        return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+      }
+      
       // For text content, render it directly
-      if (textContent) {
+      if (fileType?.startsWith('text/') || 
+          fileType === 'application/json' ||
+          fileType === 'application/javascript' ||
+          fileType === 'application/xml' ||
+          fileType === 'application/x-yaml') {
         return (
           <div className="p-4 overflow-auto max-h-[600px] whitespace-pre-wrap font-mono text-sm bg-gray-50 border rounded">
             {textContent}
@@ -1071,14 +1094,15 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         );
       }
       
-      // For other file types, use iframe or img
+      // For images
       if (fileType?.startsWith('image/')) {
-        return <img src={previewUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+        return <img src={textContent} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
       }
       
+      // For PDF and other files
       return (
         <iframe 
-          src={previewUrl} 
+          src={textContent} 
           className="w-full h-[600px] border-0" 
           title="File preview"
         />
@@ -1088,17 +1112,6 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     return (
       <div className="w-full">
         {renderContent()}
-        {!hideButtons && (
-          <div className="mt-4 flex justify-end">
-            <a 
-              href={`/api/proxy/file-storage/download/${fileId}`} 
-              download
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Descargar
-            </a>
-          </div>
-        )}
       </div>
     );
   };
