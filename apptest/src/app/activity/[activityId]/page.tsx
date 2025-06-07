@@ -33,6 +33,8 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PDFViewer from '@/components/PDFViewer'
+import FileDownloader from '@/components/FileDownloader'
+import DirectFileViewer from '@/components/DirectFileViewer'
 
 // CORS handling is now done directly in the component
 
@@ -994,260 +996,22 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
   // DocumentPreview component to preview files
   const DocumentPreview = ({ fileId, hideButtons = false }: { fileId: string | undefined, hideButtons?: boolean }) => {
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
-    const [fileType, setFileType] = useState<string | null>(null);
-    const [textContent, setTextContent] = useState<string | null>(null);
-    const [blobUrl, setBlobUrl] = useState<string | null>(null);
+    // Use the DirectFileViewer component for all files
+    if (fileId) {
+      return <DirectFileViewer fileId={fileId} height="600px" showControls={!hideButtons} />;
+    }
     
-    useEffect(() => {
-      const loadPreview = async () => {
-        try {
-          setLoading(true);
-          if (!fileId) {
-            throw new Error('No file ID provided');
-          }
-          
-          // Use our proxy to avoid CORS issues - add timestamp to prevent caching
-          const timestamp = new Date().getTime();
-          const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
-          
-          // Make the request through our proxy
-          const response = await fetch(proxyUrl, {
-            cache: 'no-store',
-            headers: {
-              'Pragma': 'no-cache',
-              'Cache-Control': 'no-cache'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Proxy returned status: ${response.status}`);
-          }
-          
-          // Get the content type
-          const contentType = response.headers.get('content-type') || 'application/octet-stream';
-          setFileType(contentType);
-          
-          // Handle different file types
-          if (contentType.startsWith('text/') || 
-              contentType === 'application/json' ||
-              contentType === 'application/javascript' ||
-              contentType === 'application/xml' ||
-              contentType === 'application/x-yaml') {
-            // For text files, get the text content
-            const text = await response.text();
-            setTextContent(text);
-          } else {
-            // For binary files, create a blob URL
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            setBlobUrl(url);
-          }
-          
-          setLoading(false);
-        } catch (err) {
-          console.error('Error loading preview:', err);
-          setError(`No se pudo cargar la vista previa: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-          setLoading(false);
-        }
-      };
-      
-      if (fileId) {
-        loadPreview();
-      } else {
-        setError('No se proporcionó un ID de archivo');
-        setLoading(false);
-      }
-      
-      // Clean up blob URLs on unmount
-      return () => {
-        if (blobUrl) {
-          URL.revokeObjectURL(blobUrl);
-        }
-      };
-    }, [fileId]);
-    
-    const renderContent = () => {
-      if (loading) {
-        return <div className="flex justify-center items-center p-8"><div className="loader"></div></div>;
-      }
-      
-      if (error) {
-        return (
-          <div className="flex flex-col space-y-4">
-            <div className="text-red-500 p-4">{error}</div>
-            {!hideButtons && (
-              <div className="mt-4 text-center">
-                <button 
-                  onClick={() => window.open(`/api/proxy/file-storage/download/${fileId}?preview=true`, '_blank')}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Abrir en nueva pestaña
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      }
-      
-      // For text content, render it directly
-      if (textContent) {
-        return (
-          <div className="p-4 overflow-auto max-h-[600px] whitespace-pre-wrap font-mono text-sm bg-gray-50 border rounded">
-            {textContent}
-          </div>
-        );
-      }
-      
-      // For binary files (images, PDFs, etc.)
-      if (blobUrl) {
-        if (fileType?.startsWith('image/')) {
-          return <img src={blobUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
-        } else if (fileType === 'application/pdf') {
-          return <PDFViewer fileUrl={blobUrl} height="600px" />;
-        } else {
-          return (
-            <iframe 
-              src={blobUrl} 
-              className="w-full h-[600px] border-0" 
-              title="File preview"
-            />
-          );
-        }
-      }
-      
-      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
-    };
-    
-    return (
-      <div className="w-full">
-        {renderContent()}
-      </div>
-    );
+    return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
   };
 
   // Direct document preview component for response details dialog
   const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
-    const [objectUrl, setObjectUrl] = useState<string | null>(null);
-    const [fileType, setFileType] = useState<string | null>(null);
-    
-    useEffect(() => {
-      if (!fileId) {
-        setError('No se proporcionó un ID de archivo');
-        setLoading(false);
-        return;
-      }
-      
-      // Use the proxy endpoint instead of direct API call to avoid CORS issues
-      // Add timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
-      
-      const fetchFile = async () => {
-        try {
-          console.log(`Fetching file from proxy: ${proxyUrl}`);
-          const response = await fetch(proxyUrl, {
-            cache: 'no-store',
-            headers: {
-              'Pragma': 'no-cache',
-              'Cache-Control': 'no-cache'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`API returned status: ${response.status}`);
-          }
-          
-          // Get content type
-          const contentType = response.headers.get('content-type') || 'application/octet-stream';
-          setFileType(contentType);
-          console.log(`File content type: ${contentType}`);
-          
-          // Create a blob URL for the content
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setObjectUrl(url);
-          setLoading(false);
-          
-        } catch (err) {
-          console.error('Error loading file:', err);
-          setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          setLoading(false);
-        }
-      };
-      
-      fetchFile();
-      
-      // Set a timeout to handle cases where the request hangs
-      const timeout = setTimeout(() => {
-        if (loading) {
-          setError('Tiempo de espera agotado al cargar el archivo');
-          setLoading(false);
-        }
-      }, 15000);
-      
-      // Clean up
-      return () => {
-        clearTimeout(timeout);
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      };
-    }, [fileId]);
-    
-    // Render loading state
-    if (loading) {
-      return (
-        <div className="flex justify-center items-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-        </div>
-      );
+    // For PDF files, try using the DirectFileViewer first
+    if (fileId) {
+      return <DirectFileViewer fileId={fileId} height="600px" />;
     }
     
-    // Render error state
-    if (error) {
-      return (
-        <div className="flex flex-col space-y-4">
-          <div className="text-red-500 p-4">{error}</div>
-          <div className="mt-4 text-center">
-            <button 
-              onClick={() => window.open(`/api/proxy/file-storage/download/${fileId}?preview=true`, '_blank')}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Abrir en nueva pestaña
-            </button>
-          </div>
-        </div>
-      );
-    }
-    
-    // Render file preview
-    if (!objectUrl) {
-      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
-    }
-    
-    // For images
-    if (fileType?.startsWith('image/')) {
-      return <img src={objectUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
-    }
-    
-    // For PDFs - use our dedicated PDFViewer component
-    if (fileType === 'application/pdf') {
-      return <PDFViewer fileUrl={objectUrl} height="600px" />;
-    }
-    
-    // For other file types
-    return (
-      <iframe 
-        src={objectUrl} 
-        className="w-full h-[600px] border-0" 
-        title="File preview"
-        sandbox="allow-same-origin allow-scripts"
-      />
-    );
+    return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
   };
 
   // Add safety timeout for loading state
@@ -1255,9 +1019,9 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     let safetyTimeoutId: NodeJS.Timeout | null = null;
     
     if (isLoading) {
-      serverLog('Safety timeout started for isLoading', { isLoading });
+      console.log('Safety timeout started for isLoading', { isLoading });
       safetyTimeoutId = setTimeout(() => {
-        serverLog('Safety timeout triggered - forcing isLoading to false', { isLoading });
+        console.log('Safety timeout triggered - forcing isLoading to false', { isLoading });
         setIsLoading(false);
       }, 15000);
     }
@@ -1265,7 +1029,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     return () => {
       if (safetyTimeoutId) {
         clearTimeout(safetyTimeoutId);
-        serverLog('Safety timeout for isLoading cleared', { isLoading });
+        console.log('Safety timeout for isLoading cleared', { isLoading });
       }
     };
   }, [isLoading]);

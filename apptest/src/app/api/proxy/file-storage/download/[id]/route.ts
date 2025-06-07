@@ -13,7 +13,8 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
-export const dynamic = 'force-dynamic'; // Disable caching for this route
+// Force dynamic to prevent caching
+export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function GET(
@@ -44,6 +45,7 @@ export async function GET(
     const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`;
     console.log(`Making request to: ${apiUrl}`);
     
+    // Use simple fetch with no streaming for reliability
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
@@ -72,6 +74,9 @@ export async function GET(
       ? 'inline'
       : (contentDisposition || `attachment; filename="file-${id}"`);
     
+    // Get the response data as array buffer
+    const data = await response.arrayBuffer();
+    
     // Set appropriate headers for CORS and content handling
     const headers = new Headers();
     headers.set('Content-Type', contentType);
@@ -79,30 +84,23 @@ export async function GET(
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     headers.set('Pragma', 'no-cache');
     headers.set('Expires', '0');
-    headers.set('Surrogate-Control', 'no-store');
     
     // Add CORS headers to ensure browser can properly handle the response
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    headers.set('Access-Control-Allow-Credentials', 'true');
+    
+    // Add content length to help browsers properly load the file
+    headers.set('Content-Length', data.byteLength.toString());
     
     // For PDF files specifically, ensure proper content type
     if (contentType.includes('pdf')) {
       headers.set('Content-Type', 'application/pdf');
     }
     
-    // Create a new ReadableStream that will pipe the response body
-    const { readable, writable } = new TransformStream();
-    
-    // Pipe the response body to our writable stream
-    response.body?.pipeTo(writable).catch(error => {
-      console.error('Error piping response:', error);
-    });
-    
     // Return the response with appropriate headers
-    return new NextResponse(readable, {
+    return new NextResponse(data, {
       status: 200,
       headers: headers
     });
