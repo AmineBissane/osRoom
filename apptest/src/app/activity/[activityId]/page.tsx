@@ -24,7 +24,9 @@ import {
   Star,
   StarHalf,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Pencil,
+  Check
 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -207,29 +209,44 @@ interface ResponseCardProps {
 
 // Response card component to display in the list
 const ResponseCard: React.FC<ResponseCardProps> = ({ response, onViewDetails }) => (
-  <div className="p-4 border border-primary/10 rounded-md">
-    <div className="flex justify-between items-center">
-      <div>
-        <p className="text-sm font-medium leading-none">{response.studentName}</p>
-        <p className="text-sm text-muted-foreground">{formatDateTime(response.submissionDate)}</p>
+  <Card className="overflow-hidden hover:shadow-md transition-all">
+    <CardContent className="p-4">
+      <div className="flex flex-col space-y-3">
+        <div className="flex justify-between items-center">
+          <div>
+            <h4 className="font-medium">{response.studentName}</h4>
+            <div className="flex items-center text-sm text-muted-foreground mt-1">
+              <Clock className="h-3.5 w-3.5 mr-1" />
+              {formatDateTime(response.submissionDate)}
+            </div>
+          </div>
+          
+          {response.grade !== undefined && response.grade !== null ? (
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5">
+              <Star className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+              {response.grade}/10
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+              Sin calificar
+            </Badge>
+          )}
+        </div>
+        
+        <div className="flex justify-end mt-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onViewDetails(response)}
+            className="w-full"
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Ver Detalles
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        {response.grade !== undefined && response.grade !== null && (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            {response.grade}/10
-          </Badge>
-        )}
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => onViewDetails(response)}
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          Ver Detalles
-        </Button>
-      </div>
-    </div>
-  </div>
+    </CardContent>
+  </Card>
 );
 
 export default function ActivityPage({ params }: { params: { activityId: string } }) {
@@ -255,6 +272,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [viewResponses, setViewResponses] = useState(false);
   const [responses, setResponses] = useState<ActivityResponse[]>([]);
+  const [filteredResponses, setFilteredResponses] = useState<ActivityResponse[]>([]);
+  const [filterType, setFilterType] = useState<'all' | 'graded' | 'not-graded'>('all');
   const [loadingResponses, setLoadingResponses] = useState(true);
   const [selectedResponse, setSelectedResponse] = useState<ActivityResponse | null>(null);
   const [viewResponseDetail, setViewResponseDetail] = useState(false);
@@ -952,11 +971,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     );
   };
 
-  // Function to fetch all responses for an activity (for teachers)
+  // Function to fetch all responses for an activity
   const fetchAllResponses = async () => {
     try {
       console.log('Fetching all responses for activity:', activityId);
       serverLog('Starting fetchAllResponses', { activityId });
+      setLoadingResponses(true);
       
       const response = await fetch(`/api/proxy/activitiesresponses/activity/${activityId}`, {
         headers: {
@@ -971,20 +991,22 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         return;
       }
       
-      const responses = await response.json();
-      console.log('Responses received:', responses);
+      const responseData = await response.json();
+      console.log('Responses received:', responseData);
       
-      setResponses(responses);
+      setResponses(responseData);
+      setFilteredResponses(responseData);
+      setFilterType('all');
       setLoadingResponses(false);
-      serverLog('Completed fetchAllResponses', { responses });
+      serverLog('Completed fetchAllResponses', { responses: responseData });
     } catch (error) {
       console.error('Error fetching responses:', error);
       setError('Error al cargar las respuestas');
       setLoadingResponses(false);
     }
   };
-
-  // Function to handle viewing all responses (for teachers)
+  
+  // Function to handle viewing all responses
   const handleViewResponses = () => {
     fetchAllResponses();
     setViewResponses(true);
@@ -1260,6 +1282,23 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         )
       );
       
+      // Update filtered responses based on current filter type
+      setFilteredResponses(prevFiltered => {
+        const updatedResponses = prevFiltered.map(resp => 
+          resp.id === responseId 
+            ? { ...resp, grade: gradeNum, gradedAt: new Date().toISOString() } 
+            : resp
+        );
+        
+        // If we're filtering by "not-graded" and this response just got graded,
+        // we should remove it from the filtered list
+        if (filterType === 'not-graded') {
+          return updatedResponses.filter(resp => resp.id !== responseId);
+        }
+        
+        return updatedResponses;
+      });
+      
       // Show success message
       setGradeSuccess(true);
       setTimeout(() => setGradeSuccess(false), 3000); // Hide after 3 seconds
@@ -1384,7 +1423,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
                         )}
                         {submittedResponse?.grade !== undefined && submittedResponse?.grade !== null && (
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            Calificación: {submittedResponse.grade}/10
+                            Calificación: {submittedResponse.grade} / 10
                           </Badge>
                         )}
                       </div>
@@ -1583,7 +1622,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       <Dialog open={viewResponses} onOpenChange={setViewResponses}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Respuestas de Estudiantes</DialogTitle>
+            <DialogTitle className="text-xl">Respuestas de Estudiantes</DialogTitle>
             <DialogDescription>
               Todas las respuestas para la actividad: {activity?.name}
             </DialogDescription>
@@ -1594,15 +1633,48 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
             </div>
           ) : responses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {responses.map((response) => (
-                <ResponseCard
-                  key={response.id}
-                  response={response}
-                  onViewDetails={handleViewResponseDetail}
-                />
-              ))}
-            </div>
+            <>
+              {/* Filtering options */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="filter-responses" className="text-sm font-medium">Filtrar por:</Label>
+                  <select 
+                    id="filter-responses"
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    onChange={(e) => {
+                      const value = e.target.value as 'all' | 'graded' | 'not-graded';
+                      setFilterType(value);
+                      
+                      if (value === 'all') {
+                        setFilteredResponses(responses);
+                      } else if (value === 'graded') {
+                        setFilteredResponses(responses.filter(r => r.grade !== undefined && r.grade !== null));
+                      } else if (value === 'not-graded') {
+                        setFilteredResponses(responses.filter(r => r.grade === undefined || r.grade === null));
+                      }
+                    }}
+                  >
+                    <option value="all">Todas las respuestas</option>
+                    <option value="graded">Calificadas</option>
+                    <option value="not-graded">Sin calificar</option>
+                  </select>
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  {responses.length} respuestas encontradas
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredResponses.map((response) => (
+                  <ResponseCard
+                    key={response.id}
+                    response={response}
+                    onViewDetails={handleViewResponseDetail}
+                  />
+                ))}
+              </div>
+            </>
           ) : (
             <div className="py-8 text-center">
               <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
@@ -1615,11 +1687,105 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       <Dialog open={viewResponseDetail} onOpenChange={setViewResponseDetail}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Detalles de Respuesta</DialogTitle>
-            <DialogDescription>
-              Respuesta de {selectedResponse?.studentName || 'estudiante'} a la actividad
-            </DialogDescription>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <DialogTitle>Detalles de Respuesta</DialogTitle>
+                <DialogDescription>
+                  Respuesta de {selectedResponse?.studentName || 'estudiante'} a la actividad
+                </DialogDescription>
+              </div>
+              
+              {/* Grade actions in the header */}
+              <div className="flex items-center gap-2">
+                {selectedResponse?.grade !== undefined && selectedResponse?.grade !== null ? (
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1.5 text-sm">
+                      <Star className="h-3.5 w-3.5 mr-1.5 text-yellow-500" />
+                      Calificación: {selectedResponse.grade}
+                    </Badge>
+                    <Button onClick={() => setShowGradeForm(true)} variant="outline" size="sm">
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      Modificar
+                    </Button>
+                  </div>
+                ) : (
+                  <Button onClick={() => setShowGradeForm(true)} variant="default" size="sm">
+                    <Star className="h-3.5 w-3.5 mr-1.5" />
+                    Calificar respuesta
+                  </Button>
+                )}
+              </div>
+            </div>
           </DialogHeader>
+          
+          {/* Grade form if showing */}
+          {showGradeForm && (
+            <Card className="mb-4 border-blue-200 bg-blue-50">
+              <CardContent className="pt-6">
+                <div className="flex flex-col space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium text-blue-800">
+                      {selectedResponse?.grade !== undefined ? 'Modificar calificación' : 'Asignar calificación'}
+                    </h3>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setShowGradeForm(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 max-w-xs">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="grade-input">Calificación (0-10)</Label>
+                        <Input 
+                          id="grade-input"
+                          type="number" 
+                          placeholder="Ej: 8.5" 
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          value={gradeValue}
+                          onChange={handleGradeInputChange}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-5">
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => saveGrade(selectedResponse?.id)}
+                        disabled={submittingGrade}
+                      >
+                        {submittingGrade ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4 mr-2" />
+                            {selectedResponse?.grade !== undefined ? 'Actualizar' : 'Guardar'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Success message */}
+          {gradeSuccess && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 flex items-center">
+              <CheckCircle2 className="h-5 w-5 mr-2 text-green-600" />
+              Calificación guardada correctamente
+            </div>
+          )}
           
           <div className="space-y-4">
             {/* Student info */}
@@ -1662,114 +1828,6 @@ export default function ActivityPage({ params }: { params: { activityId: string 
                 <div className="text-gray-500 p-4">No hay archivo disponible</div>
               )}
             </div>
-            
-            {/* Grade form */}
-            <div className="border rounded p-4">
-              <h3 className="font-medium mb-2">Calificación</h3>
-              {selectedResponse?.grade !== undefined && selectedResponse?.grade !== null ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">Calificación actual: </span>
-                    <span className="text-lg">{selectedResponse.grade}</span>
-                  </div>
-                  <Button onClick={() => setShowGradeForm(true)} variant="outline" size="sm">
-                    Modificar calificación
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  {!showGradeForm ? (
-                    <Button onClick={() => setShowGradeForm(true)} variant="default" size="sm">
-                      Calificar respuesta
-                    </Button>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <Input 
-                          type="number" 
-                          placeholder="Calificación (0-10)" 
-                          className="w-40"
-                          min={0}
-                          max={10}
-                          step={0.1}
-                          value={gradeValue}
-                          onChange={handleGradeInputChange}
-                        />
-                        <Button 
-                          variant="default" 
-                          size="sm"
-                          onClick={() => saveGrade(selectedResponse?.id)}
-                          disabled={submittingGrade}
-                        >
-                          {submittingGrade ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Guardando...
-                            </>
-                          ) : (
-                            'Guardar calificación'
-                          )}
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setShowGradeForm(false)}
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {showGradeForm && selectedResponse?.grade !== undefined && (
-                <div className="mt-4 space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Input 
-                      type="number" 
-                      placeholder="Nueva calificación (0-10)" 
-                      className="w-40"
-                      min={0}
-                      max={10}
-                      step={0.1}
-                      value={gradeValue}
-                      onChange={handleGradeInputChange}
-                    />
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={() => saveGrade(selectedResponse?.id)}
-                      disabled={submittingGrade}
-                    >
-                      {submittingGrade ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Actualizando...
-                        </>
-                      ) : (
-                        'Actualizar calificación'
-                      )}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setShowGradeForm(false)}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Success message */}
-            {gradeSuccess && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 flex items-center">
-                <CheckCircle2 className="h-5 w-5 mr-2 text-green-600" />
-                Calificación guardada correctamente
-              </div>
-            )}
           </div>
           
           <DialogFooter>
