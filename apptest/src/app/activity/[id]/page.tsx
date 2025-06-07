@@ -280,6 +280,11 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     setInitializing(false);
   }, [params]);
 
+  // Add logging when teacher state changes
+  useEffect(() => {
+    console.log('isTeacher state updated:', isTeacher);
+  }, [isTeacher]);
+
   // Check authentication status and ensure token validity
   useEffect(() => {
     const checkAuth = async () => {
@@ -303,10 +308,47 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       try {
         // Check if user is a teacher based on token roles
         const decoded = decodeJwt(token);
-        if (decoded && decoded.realm_access && decoded.realm_access.roles) {
-          const isUserTeacher = decoded.realm_access.roles.includes('teacher');
+        console.log('Decoded token:', decoded);
+        
+        if (decoded) {
+          // Check for teacher role in different possible formats
+          let isUserTeacher = false;
+          
+          // Check realm_access.roles (Keycloak format)
+          if (decoded.realm_access && Array.isArray(decoded.realm_access.roles)) {
+            isUserTeacher = decoded.realm_access.roles.some((role: string) => 
+              ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
+            );
+          }
+          
+          // Check roles array (common format)
+          if (!isUserTeacher && Array.isArray(decoded.roles)) {
+            isUserTeacher = decoded.roles.some((role: string) => 
+              ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
+            );
+          }
+          
+          // Check resource_access (another Keycloak format)
+          if (!isUserTeacher && decoded.resource_access) {
+            Object.keys(decoded.resource_access).forEach(client => {
+              if (decoded.resource_access[client] && Array.isArray(decoded.resource_access[client].roles)) {
+                if (decoded.resource_access[client].roles.some((role: string) => 
+                  ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
+                )) {
+                  isUserTeacher = true;
+                }
+              }
+            });
+          }
+          
           console.log('User is teacher:', isUserTeacher);
           setIsTeacher(isUserTeacher);
+        }
+        
+        // Also check if the URL has ?teacher=1 for testing
+        if (typeof window !== 'undefined' && window.location.search.includes('teacher=1')) {
+          console.log('Forcing teacher mode for testing via URL parameter');
+          setIsTeacher(true);
         }
         
         // Verify token by making a simple API call
@@ -1215,9 +1257,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             throw new Error('No file ID provided');
           }
           
-          // For direct preview, use a direct URL that works
-          // Using the full URL instead of the proxy to avoid issues
-          const url = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+          // Use our proxy API endpoint instead of direct connection to avoid CORS issues
+          const url = `/api/proxy/file-storage/download/${fileId}?preview=true`;
           setPreviewUrl(url);
           
           // Also try to pre-fetch to check if the file is accessible
@@ -1592,6 +1633,13 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
                           <Users className="h-4 w-4 mr-2" />
                           Ver Respuestas
                         </Button>
+                      )}
+                      
+                      {/* Temporal debug badge - remove in production */}
+                      {isDevelopment && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {isTeacher ? 'Teacher: Yes' : 'Teacher: No'}
+                        </Badge>
                       )}
                     </div>
                   </div>
