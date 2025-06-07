@@ -22,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("api/v1/file-storage")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type"})
 public class StorageController {
     private final StorageService storageService;
     
@@ -38,17 +39,24 @@ public class StorageController {
     );
 
     @PostMapping("/upload")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<String> uploadFileToFileSystem(@RequestPart("file") MultipartFile file) {
         return ResponseEntity.ok().body(storageService.uploadFile(file));
     }
 
     @GetMapping("/download/{id}")
+    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type"})
     public ResponseEntity<?> downloadFile(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean preview) {
         try {
             var fileData = storageService.downloadFile(id);
             String contentType = determineContentType(fileData.getFileName(), fileData.getContentType());
             
             HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type");
+            
             if (preview) {
                 // For preview, use inline disposition
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileData.getFileName() + "\"");
@@ -87,12 +95,14 @@ public class StorageController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<Void> deleteFileFromFileSystem(@PathVariable String id) {
         storageService.deleteFile(id);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/metadata")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<Map<String, Object>> getFileMetadata(@PathVariable String id) {
         File fileRecord = storageService.findFileById(id);
         
