@@ -31,43 +31,31 @@ export async function OPTIONS() {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
-    const { id } = params
+    const { activityId } = params;
     
     // Get the token from the request cookies
-    const token = request.cookies.get('access_token')?.value
-    const refreshTokenValue = request.cookies.get('refresh_token')?.value
-    
-    // Also check for Authorization header in case token is passed that way
-    const authHeader = request.headers.get('authorization')
-    const tokenFromHeader = authHeader ? authHeader.replace('Bearer ', '') : null
+    const token = request.cookies.get('access_token')?.value;
+    const authHeader = request.headers.get('authorization');
+    const tokenFromHeader = authHeader ? authHeader.replace('Bearer ', '') : null;
     
     // Use token from cookie or header
-    const accessToken = token || tokenFromHeader
-
+    const accessToken = token || tokenFromHeader;
+    
     if (!accessToken) {
       return NextResponse.json(
         { error: 'No authentication token found' },
         { status: 401 }
-      )
+      );
     }
 
-    console.log(`Fetching activity responses for activity ID: ${id}`)
-    console.log('Using token:', accessToken.substring(0, 20) + '...')
+    console.log(`Fetching activity responses for activity: ${activityId}`);
 
-    // Decode the token to get user information
-    const decodedToken = decodeJwt(accessToken);
-    if (!decodedToken) {
-      return NextResponse.json(
-        { error: 'Invalid token format' },
-        { status: 401 }
-      )
-    }
-
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${id}`
-    console.log(`Making request to: ${apiUrl}`)
+    // Make request to backend API
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}`;
+    console.log(`Making request to: ${apiUrl}`);
 
     const response = await fetch(apiUrl, {
       headers: {
@@ -75,168 +63,44 @@ export async function GET(
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      cache: 'no-store',
-      mode: 'cors'
-    })
+      cache: 'no-store'
+    });
     
-    console.log(`Response status: ${response.status}`)
-
-    // If we get a 401, try to refresh the token
-    if (response.status === 401 && refreshTokenValue) {
-      console.log('Token expired, attempting refresh')
-      
-      try {
-        // Get new tokens
-        const newTokens = await refreshToken(refreshTokenValue)
-        
-        // Create a response with the data
-        const nextResponse = NextResponse.next()
-        
-        // Set the new tokens as cookies
-        nextResponse.cookies.set('access_token', newTokens.access_token, {
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7 // 1 week
-        })
-        
-        nextResponse.cookies.set('refresh_token', newTokens.refresh_token, {
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 30 // 30 days
-        })
-        
-        if (newTokens.id_token) {
-          nextResponse.cookies.set('id_token', newTokens.id_token, {
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7 // 1 week
-          })
-        }
-        
-        // Decode the new token
-        const newDecodedToken = decodeJwt(newTokens.access_token);
-        if (!newDecodedToken) {
-          return NextResponse.json(
-            { error: 'Invalid token format after refresh' },
-            { status: 401 }
-          )
-        }
-        
-        console.log('Retrying with new token:', newTokens.access_token.substring(0, 20) + '...')
-        
-        // Retry the request with the new token
-        const retryResponse = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${newTokens.access_token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          cache: 'no-store',
-          mode: 'cors'
-        })
-        
-        console.log(`Retry response status: ${retryResponse.status}`)
-        
-        if (!retryResponse.ok) {
-          // Try to get more details from the error response
-          try {
-            const errorData = await retryResponse.text()
-            console.error('Error details:', errorData)
-          } catch (e) {
-            console.error('Could not read error details')
-          }
-          
-          return NextResponse.json(
-            { error: `Failed to fetch activity responses after token refresh: ${retryResponse.status}` },
-            { status: retryResponse.status }
-          )
-        }
-        
-        const data = await retryResponse.json()
-        console.log('Response data:', data);
-        
-        // Check if the current user has already submitted a response
-        let userHasSubmitted = false;
-        
-        if (Array.isArray(data)) {
-          // For testing purposes, check if any response has studentId = 1
-          userHasSubmitted = data.some(
-            (response: any) => response.studentId === 1
-          );
-          console.log('User has submitted:', userHasSubmitted);
-        }
-        
-        // Return the data with the updated cookies and submission status
-        return NextResponse.json({
-          responses: data,
-          userHasSubmitted
-        }, {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET,OPTIONS,POST',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-          }
-        })
-      } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError)
-        return NextResponse.json(
-          { error: 'Session expired' },
-          { status: 401 }
-        )
-      }
-    }
+    console.log(`Response status: ${response.status}`);
 
     if (!response.ok) {
-      console.error('Error response:', response.status)
-      
       // Try to get more details from the error response
       try {
-        const errorData = await response.text()
-        console.error('Error details:', errorData)
+        const errorData = await response.text();
+        console.error('Error details:', errorData);
       } catch (e) {
-        console.error('Could not read error details')
+        console.error('Could not read error details');
       }
       
       return NextResponse.json(
         { error: `Failed to fetch activity responses: ${response.status}` },
         { status: response.status }
-      )
+      );
     }
 
-    const data = await response.json()
-    console.log('Response data:', data);
+    const data = await response.json();
+    console.log('Response data received');
     
-    // Check if the current user has already submitted a response
-    let userHasSubmitted = false;
-    
-    if (Array.isArray(data)) {
-      // For testing purposes, check if any response has studentId = 1
-      userHasSubmitted = data.some(
-        (response: any) => response.studentId === 1
-      );
-      console.log('User has submitted:', userHasSubmitted);
-    }
-    
-    return NextResponse.json({
-      responses: data,
-      userHasSubmitted
-    }, {
+    return NextResponse.json(data, {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS,POST',
+        'Access-Control-Allow-Methods': 'GET,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       }
-    })
+    });
   } catch (error) {
-    console.error('API error:', error)
+    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch activity responses', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
-    )
+    );
   }
 }
 
