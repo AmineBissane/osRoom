@@ -219,7 +219,7 @@ const ResponseCard: React.FC<ResponseCardProps> = ({ response, onViewDetails }) 
   </div>
 );
 
-export default function ActivityPage({ params }: { params: { id: string } }) {
+export default function ActivityPage({ params }: { params: { activityId: string } }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
