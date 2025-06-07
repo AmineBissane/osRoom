@@ -243,6 +243,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [viewResponses, setViewResponses] = useState(false);
   const [responses, setResponses] = useState<ActivityResponse[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(true);
+  const [selectedResponse, setSelectedResponse] = useState<ActivityResponse | null>(null);
+  const [viewResponseDetail, setViewResponseDetail] = useState(false);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -964,8 +966,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
 
   // Function to view a specific response detail
   const handleViewResponseDetail = (response: ActivityResponse) => {
-    // Implement the logic to view a specific response detail
-    console.log('Viewing response detail:', response);
+    setSelectedResponse(response);
+    setViewResponseDetail(true);
   };
 
   // Function to handle grade input change
@@ -1567,6 +1569,64 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           ) : (
             <div className="py-8 text-center">
               <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for viewing response details */}
+      <Dialog open={viewResponseDetail} onOpenChange={setViewResponseDetail}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Detalles de la Respuesta</DialogTitle>
+            <DialogDescription>
+              Respuesta de {selectedResponse?.studentName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedResponse && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium">Fecha de Envío</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDateTime(selectedResponse.submissionDate)}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium">Calificación</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedResponse.grade !== undefined && selectedResponse.grade !== null 
+                      ? `${selectedResponse.grade}/10`
+                      : 'Sin calificar'}
+                  </p>
+                </div>
+              </div>
+              
+              {selectedResponse.note && (
+                <div>
+                  <h4 className="font-medium">Nota del Estudiante</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {selectedResponse.note}
+                  </p>
+                </div>
+              )}
+              
+              {selectedResponse.responseFileId && (
+                <div>
+                  <h4 className="font-medium">Archivo Adjunto</h4>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadFile(selectedResponse.responseFileId)}
+                    className="w-full mt-2"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar archivo
+                  </Button>
+                  <DocumentPreview fileId={selectedResponse.responseFileId} />
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
