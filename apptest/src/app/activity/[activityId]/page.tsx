@@ -999,8 +999,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // Create preview URL
-          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          // Create preview URL with direct access
+          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&direct=true`;
           setPreviewUrl(previewUrl);
           
           // Get file metadata to determine type
