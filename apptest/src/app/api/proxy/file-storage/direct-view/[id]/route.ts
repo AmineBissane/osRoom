@@ -55,8 +55,21 @@ export async function GET(
     });
     
     if (!response.ok) {
+      console.error(`API returned error status: ${response.status}`);
+      
+      // For better debugging, try to get the response body
+      let errorBody = '';
+      try {
+        errorBody = await response.text();
+      } catch (e) {
+        errorBody = 'Could not read error body';
+      }
+      
       return NextResponse.json(
-        { error: `API returned status: ${response.status}` },
+        { 
+          error: `API returned status: ${response.status}`,
+          details: errorBody 
+        },
         { status: response.status }
       );
     }
@@ -65,6 +78,8 @@ export async function GET(
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
     
+    console.log(`Content type: ${contentType}`);
+    
     // For previews, use inline disposition
     const disposition = isPreview 
       ? 'inline'
@@ -72,6 +87,7 @@ export async function GET(
     
     // Get the response data
     const data = await response.arrayBuffer();
+    console.log(`Got file data, size: ${data.byteLength} bytes`);
     
     // Set appropriate headers
     const headers = new Headers();
@@ -85,6 +101,10 @@ export async function GET(
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Access-Control-Allow-Credentials', 'true');
+    
+    // Add content length
+    headers.set('Content-Length', data.byteLength.toString());
     
     // For PDF files, ensure proper content type
     if (contentType.includes('pdf')) {
@@ -99,7 +119,7 @@ export async function GET(
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch file from API' },
+      { error: 'Failed to fetch file from API', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

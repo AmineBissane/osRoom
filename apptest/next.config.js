@@ -2,6 +2,13 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Allow cross-origin requests during development
+  allowedDevOrigins: [
+    'http://localhost:3000',
+    'http://82.29.168.17:3000',
+    'http://82.29.168.17:8030',
+    'http://82.29.168.17:8222'
+  ],
   async headers() {
     return [
       {
