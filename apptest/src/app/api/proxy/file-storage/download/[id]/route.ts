@@ -24,14 +24,15 @@ export async function GET(
     // Ensure token is properly formatted
     const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     
-    // Make the request to the gateway
-    const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/${isPreview ? 'preview' : 'download'}/${id}`;
+    // Make the request to the gateway - use preview as a query parameter
+    const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${id}?preview=${isPreview}`;
     console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': cleanToken
+        'Authorization': cleanToken,
+        'Accept': '*/*'
       }
     });
     
@@ -63,7 +64,8 @@ export async function GET(
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': disposition,
-        'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache'
+        'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache',
+        'Accept-Ranges': 'bytes'
       }
     });
     
