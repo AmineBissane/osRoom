@@ -24,8 +24,13 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fileType, setFileType] = useState<'pdf' | 'image' | 'unknown'>('unknown');
-  const [fileUrl, setFileUrl] = useState<string>('');
   const [iframeKey, setIframeKey] = useState<number>(Date.now());
+
+  // Build the file URL with timestamp to prevent caching
+  const getFileUrl = (): string => {
+    const timestamp = new Date().getTime();
+    return `/api/simple-file/${fileId}?preview=true&t=${timestamp}`;
+  };
 
   // Determine file type based on fileId or use forced type
   useEffect(() => {
@@ -62,47 +67,11 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
     }
   }, [fileId, forceFileType]);
 
-  // Fetch the file content and create a blob URL for secure viewing
+  // Force iframe refresh when fileId changes
   useEffect(() => {
-    const fetchFile = async () => {
-      if (!fileId) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Add timestamp to prevent caching
-        const timestamp = new Date().getTime();
-        const url = `/api/simple-file/${fileId}?preview=true&t=${timestamp}`;
-        
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to load file: ${response.statusText}`);
-        }
-        
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        
-        setFileUrl(blobUrl);
-        setLoading(false);
-        // Generate a new key for the iframe to force refresh
-        setIframeKey(Date.now());
-      } catch (err) {
-        console.error('Error loading file:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load document');
-        setLoading(false);
-      }
-    };
-    
-    fetchFile();
-    
-    // Cleanup function to revoke object URL
-    return () => {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
-      }
-    };
+    setIframeKey(Date.now());
+    setLoading(true);
+    setError(null);
   }, [fileId]);
 
   // Handle loading state
@@ -140,31 +109,32 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
         </div>
       ) : (
         <>
-          {fileUrl && (
-            fileType === 'pdf' ? (
-              <iframe
-                key={iframeKey}
-                src={fileUrl}
-                width={width}
-                height={height}
-                className={loading ? 'hidden' : ''}
-                onLoad={handleLoad}
-                onError={handleError}
-                style={{ border: 'none' }}
-              />
-            ) : (
+          {fileType === 'pdf' ? (
+            // Use iframe for PDFs
+            <iframe
+              key={iframeKey}
+              src={getFileUrl()}
+              width={width}
+              height={height}
+              className={loading ? 'hidden' : ''}
+              onLoad={handleLoad}
+              onError={handleError}
+              style={{ border: 'none' }}
+            />
+          ) : (
+            // Use img for images
+            <div className={loading ? 'hidden' : ''} style={{ maxHeight: height, overflow: 'auto' }}>
               <img
-                src={fileUrl}
+                src={getFileUrl()}
                 alt="Document preview"
-                className={`max-w-full ${loading ? 'hidden' : ''}`}
-                style={{ maxHeight: height }}
+                className="max-w-full"
                 onLoad={handleLoad}
                 onError={handleError}
               />
-            )
+            </div>
           )}
           
-          {showDownloadButton && !loading && !error && fileUrl && (
+          {showDownloadButton && !loading && !error && (
             <div className="mt-2">
               <SimpleFileDownloader 
                 fileId={fileId} 

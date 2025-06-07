@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from './ui/button';
 import { Download, Loader2 } from 'lucide-react';
 
@@ -21,8 +21,9 @@ const SimpleFileDownloader: React.FC<SimpleFileDownloaderProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const downloadFile = async () => {
+  const downloadFile = () => {
     if (!fileId) {
       setError('No file ID provided');
       return;
@@ -32,45 +33,15 @@ const SimpleFileDownloader: React.FC<SimpleFileDownloaderProps> = ({
       setLoading(true);
       setError(null);
       
-      // Add timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const url = `/api/simple-file/${fileId}?preview=false&t=${timestamp}`;
-      
-      // Use fetch instead of window.open to handle authentication properly
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download: ${response.statusText}`);
+      // Submit the form to trigger download
+      if (formRef.current) {
+        formRef.current.submit();
       }
       
-      // Get the file blob
-      const blob = await response.blob();
-      
-      // Create a temporary URL for the blob
-      const blobUrl = window.URL.createObjectURL(blob);
-      
-      // Create a temporary link element to trigger download
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      
-      // Try to get the filename from response headers or use the default
-      const contentDisposition = response.headers.get('content-disposition');
-      const downloadName = 
-        contentDisposition 
-          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') 
-          : fileName || `file-${fileId}`;
-      
-      link.download = downloadName;
-      
-      // Append to body, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Release the blob URL
-      window.URL.revokeObjectURL(blobUrl);
-      
-      setLoading(false);
+      // Reset loading state after a short delay
+      setTimeout(() => {
+        setLoading(false);
+      }, 2000);
     } catch (err) {
       console.error('Error downloading file:', err);
       setError(err instanceof Error ? err.message : 'Error downloading file');
@@ -78,8 +49,24 @@ const SimpleFileDownloader: React.FC<SimpleFileDownloaderProps> = ({
     }
   };
 
+  // Create a unique form ID for this instance
+  const formId = `download-form-${fileId}`;
+
   return (
     <div className={className}>
+      {/* Hidden form for download */}
+      <form
+        ref={formRef}
+        id={formId}
+        action={`/api/simple-file/${fileId}`}
+        method="GET"
+        target="_blank"
+        style={{ display: 'none' }}
+      >
+        <input type="hidden" name="preview" value="false" />
+        <input type="hidden" name="t" value={Date.now().toString()} />
+      </form>
+      
       <Button
         variant={buttonVariant}
         onClick={downloadFile}
