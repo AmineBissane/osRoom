@@ -50,10 +50,10 @@ export async function GET(
   }
   
   try {
-    // Try direct localhost first - we're inside the VPS
-    const localUrl = `http://localhost:8222/api/v1/file-storage/${fileId}/metadata`;
+    // Always use the public IP since we're having issues with localhost
+    const metadataUrl = `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`;
     
-    console.log(`Attempting metadata fetch from: ${localUrl}`);
+    console.log(`Attempting metadata fetch from: ${metadataUrl}`);
     
     // Configure request options
     const options: RequestInit = {
@@ -68,19 +68,12 @@ export async function GET(
       signal: AbortSignal.timeout(5000)
     };
     
-    // Try direct localhost call
-    let response = await fetchWithRetry(localUrl, options, 1);
+    // Fetch metadata
+    let response = await fetchWithRetry(metadataUrl, options, 2);
     
-    // If that fails, try the public IP as a fallback
+    // If the request failed, return an error
     if (!response.ok) {
-      console.log(`Direct localhost metadata request failed, trying public IP`);
-      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`;
-      response = await fetchWithRetry(publicUrl, options, 1);
-    }
-    
-    // If all attempts failed, return an error
-    if (!response.ok) {
-      console.error('All metadata fetch attempts failed');
+      console.error('Metadata fetch failed');
       return NextResponse.json(
         { error: 'No se pudieron obtener los metadatos del archivo' },
         { status: 502 }
@@ -145,8 +138,8 @@ export async function HEAD(
   }
   
   try {
-    // Try direct localhost first - we're inside the VPS
-    const localUrl = `http://localhost:8222/api/v1/file-storage/${fileId}/metadata`;
+    // Always use the public IP since we're having issues with localhost
+    const metadataUrl = `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`;
     
     // Configure request options with short timeout
     const options: RequestInit = {
@@ -161,19 +154,12 @@ export async function HEAD(
       signal: AbortSignal.timeout(5000)
     };
     
-    // Try direct localhost call
-    let response = await fetchWithRetry(localUrl, options, 1);
+    // Fetch metadata headers
+    let response = await fetchWithRetry(metadataUrl, options, 1);
     
-    // If that fails, try the public IP as a fallback
+    // If the request failed, return an error
     if (!response.ok) {
-      console.log(`Direct localhost HEAD metadata request failed, trying public IP`);
-      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`;
-      response = await fetchWithRetry(publicUrl, options, 1);
-    }
-    
-    // If all attempts failed, return an error
-    if (!response.ok) {
-      console.error('All HEAD metadata requests failed');
+      console.error('HEAD metadata request failed');
       return new NextResponse(null, { status: 502 });
     }
     

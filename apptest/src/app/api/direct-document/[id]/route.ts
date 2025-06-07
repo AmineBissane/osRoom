@@ -123,8 +123,8 @@ export async function GET(
   }
   
   try {
-    // Try direct localhost first since we're on the same server
-    const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+    // Always use the public IP since we're having issues with localhost
+    const fileUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
     // Configure request options
     const options: RequestInit = {
@@ -140,21 +140,14 @@ export async function GET(
     };
     
     // Attempt the fetch
-    console.log(`Attempting document fetch from: ${localUrl}`);
-    let response = await fetchWithRetry(localUrl, options, 2);
-    
-    // If that fails, try the public IP as a fallback
-    if (!response.ok) {
-      console.log(`Direct localhost request failed, trying public IP`);
-      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
-      response = await fetchWithRetry(publicUrl, options, 1);
-    }
+    console.log(`Attempting document fetch from: ${fileUrl}`);
+    let response = await fetchWithRetry(fileUrl, options, 2);
     
     // If all URLs failed, return an error
     if (!response.ok) {
-      console.error('All document fetch attempts failed');
+      console.error('Document fetch attempt failed');
       return NextResponse.json(
-        { error: 'No se pudo recuperar el documento de ninguna fuente' },
+        { error: 'No se pudo recuperar el documento' },
         { status: 502 }
       );
     }
@@ -255,8 +248,8 @@ export async function HEAD(
   }
   
   try {
-    // Try direct localhost first - we're inside the VPS
-    const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+    // Always use the public IP since we're having issues with localhost
+    const fileUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
     // Configure request options with short timeout
     const options: RequestInit = {
@@ -271,19 +264,12 @@ export async function HEAD(
       signal: AbortSignal.timeout(5000)
     };
     
-    // Try direct localhost call first
-    let response = await fetchWithRetry(localUrl, options, 1);
-    
-    // If that fails, try the public IP as a fallback
-    if (!response.ok) {
-      console.log(`Direct localhost HEAD request failed, trying public IP`);
-      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
-      response = await fetchWithRetry(publicUrl, options, 1);
-    }
+    // Make HEAD request
+    let response = await fetchWithRetry(fileUrl, options, 1);
     
     // If all URLs failed, return an error
     if (!response.ok) {
-      console.error('All HEAD requests failed');
+      console.error('HEAD request failed');
       return new NextResponse(null, { status: 502 });
     }
     
