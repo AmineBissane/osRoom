@@ -47,14 +47,14 @@ export function extractToken(request: NextRequest): string | null {
 /**
  * Utility function to make fetch requests with retry logic
  */
-export async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+export async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       // If not the first attempt, wait a bit before retrying
       if (attempt > 0) {
-        await new Promise(resolve => setTimeout(resolve, 300)); // Reduced wait time
+        await new Promise(resolve => setTimeout(resolve, 300));
         console.log(`Retry attempt ${attempt} for ${url}`);
       }
       
@@ -100,7 +100,7 @@ export async function GET(
   const fileId = params.id;
   if (!fileId) {
     return NextResponse.json(
-      { error: 'Missing file ID' },
+      { error: 'Falta el ID del archivo' },
       { status: 400 }
     );
   }
@@ -110,24 +110,23 @@ export async function GET(
   const isPreview = searchParams.get('preview') !== 'false';
   
   // Log request details
-  console.log(`Direct document request for: ${fileId}`);
+  console.log(`Direct document request for: ${fileId}, preview: ${isPreview}`);
   
   // Extract JWT token
   const token = extractToken(request);
   
   if (!token) {
     return NextResponse.json(
-      { error: 'No authentication token found' },
+      { error: 'No se encontró token de autenticación' },
       { status: 401 }
     );
   }
   
   try {
     // Try direct localhost first since we're on the same server
-    // No need for additional proxying inside the VPS
     const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
-    // Configure request options with longer timeout
+    // Configure request options
     const options: RequestInit = {
       method: 'GET',
       headers: {
@@ -136,26 +135,26 @@ export async function GET(
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
       cache: 'no-store',
-      // Use a longer timeout for document fetching
-      signal: AbortSignal.timeout(30000) // 30 seconds
+      // Use a reasonable timeout
+      signal: AbortSignal.timeout(15000) // 15 seconds
     };
     
     // Attempt the fetch
-    console.log(`Attempting direct document fetch from: ${localUrl}`);
-    let response = await fetchWithRetry(localUrl, options, 3);
+    console.log(`Attempting document fetch from: ${localUrl}`);
+    let response = await fetchWithRetry(localUrl, options, 2);
     
     // If that fails, try the public IP as a fallback
     if (!response.ok) {
       console.log(`Direct localhost request failed, trying public IP`);
       const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
-      response = await fetchWithRetry(publicUrl, options, 2);
+      response = await fetchWithRetry(publicUrl, options, 1);
     }
     
     // If all URLs failed, return an error
     if (!response.ok) {
       console.error('All document fetch attempts failed');
       return NextResponse.json(
-        { error: 'Failed to retrieve document from all sources' },
+        { error: 'No se pudo recuperar el documento de ninguna fuente' },
         { status: 502 }
       );
     }
@@ -164,10 +163,19 @@ export async function GET(
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
     
-    // For previews, ensure inline disposition
+    // Get the original filename if available
+    let filename = 'documento';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1];
+      }
+    }
+    
+    // For previews, ensure inline disposition; for downloads, force attachment
     const disposition = isPreview 
-      ? 'inline'
-      : (contentDisposition || `attachment; filename="file-${fileId}"`);
+      ? 'inline' 
+      : `attachment; filename="${filename}"`;
     
     // Get the response data
     const data = await response.arrayBuffer();
@@ -181,7 +189,7 @@ export async function GET(
     // Add CORS headers
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     headers.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
     
     // Add caching headers to prevent caching
@@ -207,13 +215,13 @@ export async function GET(
     // Check if it's an abort error
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
-        { error: 'Request timed out' },
+        { error: 'La solicitud ha excedido el tiempo de espera' },
         { status: 504 }
       );
     }
     
     return NextResponse.json(
-      { error: 'Failed to retrieve document' },
+      { error: 'No se pudo recuperar el documento' },
       { status: 500 }
     );
   }
@@ -221,7 +229,6 @@ export async function GET(
 
 /**
  * Handle HEAD requests to check document availability
- * Browsers often make HEAD requests before GET to check content type and availability
  */
 export async function HEAD(
   request: NextRequest,
@@ -251,67 +258,31 @@ export async function HEAD(
     // Try direct localhost first - we're inside the VPS
     const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
-    // Create a fetch request with a short timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // shorter timeout for HEAD
+    // Configure request options with short timeout
+    const options: RequestInit = {
+      method: 'HEAD',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': '*/*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+      cache: 'no-store',
+      // Use a shorter timeout for HEAD requests
+      signal: AbortSignal.timeout(5000)
+    };
     
-    // Make a HEAD request to the document service
-    console.log(`Trying HEAD request to: ${localUrl}`);
-    let response;
+    // Try direct localhost call first
+    let response = await fetchWithRetry(localUrl, options, 1);
     
-    try {
-      response = await fetch(localUrl, {
-        method: 'HEAD',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': '*/*',
-        },
-        signal: controller.signal
-      });
-      
-      // Clear the timeout
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.log(`HEAD request to localhost failed, trying public IP`);
-        // Try the public IP as fallback
-        const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
-        const backupController = new AbortController();
-        const backupTimeoutId = setTimeout(() => backupController.abort(), 3000);
-        
-        response = await fetch(publicUrl, {
-          method: 'HEAD',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': '*/*',
-          },
-          signal: backupController.signal
-        });
-        
-        clearTimeout(backupTimeoutId);
-      }
-    } catch (error) {
-      console.log(`Error with HEAD request:`, error);
-      
-      // Try the public IP as fallback
+    // If that fails, try the public IP as a fallback
+    if (!response.ok) {
+      console.log(`Direct localhost HEAD request failed, trying public IP`);
       const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
-      const backupController = new AbortController();
-      const backupTimeoutId = setTimeout(() => backupController.abort(), 3000);
-      
-      response = await fetch(publicUrl, {
-        method: 'HEAD',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': '*/*',
-        },
-        signal: backupController.signal
-      });
-      
-      clearTimeout(backupTimeoutId);
+      response = await fetchWithRetry(publicUrl, options, 1);
     }
     
     // If all URLs failed, return an error
-    if (!response || !response.ok) {
+    if (!response.ok) {
       console.error('All HEAD requests failed');
       return new NextResponse(null, { status: 502 });
     }
@@ -337,7 +308,7 @@ export async function HEAD(
     // Add CORS headers
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     headers.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
     
     // Add caching headers to prevent caching
