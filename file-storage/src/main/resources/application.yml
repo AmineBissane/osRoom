@@ -3,14 +3,7 @@ spring:
     name: file-storage
   config:
     import: optional:configserver:http://osroom-config-server-1:8888
-  mvc:
-    cors:
-      allowed-origins: "*"
-      allowed-methods: "*"
-      allowed-headers: "*"
-      exposed-headers: "Content-Disposition,Content-Type"
-      allow-credentials: false
-      max-age: 3600
+ 
 
 # Disable CSRF for API endpoints
 security:
