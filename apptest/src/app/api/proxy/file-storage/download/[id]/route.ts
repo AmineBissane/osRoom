@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Max-Age': '86400', // 24 hours
+    },
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -58,14 +71,28 @@ export async function GET(
     // Get the response data
     const data = await response.arrayBuffer();
     
+    // Set appropriate headers for CORS and content handling
+    const headers = new Headers();
+    headers.set('Content-Type', contentType);
+    headers.set('Content-Disposition', disposition);
+    headers.set('Cache-Control', isPreview ? 'public, max-age=300' : 'private, no-cache');
+    
+    // Add CORS headers to ensure browser can properly handle the response
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    
+    // For PDF files specifically, ensure proper content type
+    if (contentType.includes('pdf')) {
+      headers.set('Content-Type', 'application/pdf');
+    }
+    
     // Return the response with appropriate headers
     return new NextResponse(data, {
       status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': disposition,
-        'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache',
-      }
+      headers: headers
     });
   } catch (error) {
     console.error('Proxy error:', error);

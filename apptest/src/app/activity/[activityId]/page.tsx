@@ -18,6 +18,11 @@ import {
   Clock,
   CheckCircle2,
   Paperclip,
+  X,
+  Plus,
+  Users,
+  Star,
+  StarHalf
 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -27,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import PDFViewer from '@/components/PDFViewer'
 
 // CORS handling is now done directly in the component
 
@@ -379,7 +385,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           serverLog("Backup timeout triggered - fetchData didn't complete in time", { fetchDataCompleted });
           setIsLoading(false);
         }
-      }, 10000); // 10 seconds should be more than enough for the fetch to complete
+      }, 10000);
       
       // Clear the timeout if the component unmounts or activityId changes
       return () => {
@@ -1061,7 +1067,21 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       }
       
       if (error) {
-        return <div className="text-red-500 p-4">{error}</div>;
+        return (
+          <div className="flex flex-col space-y-4">
+            <div className="text-red-500 p-4">{error}</div>
+            {!hideButtons && (
+              <div className="mt-4 text-center">
+                <button 
+                  onClick={() => window.open(`/api/proxy/file-storage/download/${fileId}?preview=true`, '_blank')}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Abrir en nueva pestaña
+                </button>
+              </div>
+            )}
+          </div>
+        );
       }
       
       // For text content, render it directly
@@ -1077,6 +1097,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       if (blobUrl) {
         if (fileType?.startsWith('image/')) {
           return <img src={blobUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+        } else if (fileType === 'application/pdf') {
+          return <PDFViewer fileUrl={blobUrl} height="600px" />;
         } else {
           return (
             <iframe 
@@ -1112,20 +1134,13 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         return;
       }
       
-      // Direct URL to the file without any token or authentication
-      const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+      // Use the proxy endpoint instead of direct API call to avoid CORS issues
+      const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
       
       const fetchFile = async () => {
         try {
-          console.log(`Fetching file from: ${apiUrl}`);
-          const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': '*/*',
-            },
-            mode: 'cors',
-            cache: 'no-cache',
-          });
+          console.log(`Fetching file from proxy: ${proxyUrl}`);
+          const response = await fetch(proxyUrl);
           
           if (!response.ok) {
             throw new Error(`API returned status: ${response.status}`);
@@ -1166,7 +1181,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           URL.revokeObjectURL(objectUrl);
         }
       };
-    }, [fileId, loading]);
+    }, [fileId]);
     
     // Render loading state
     if (loading) {
@@ -1183,14 +1198,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         <div className="flex flex-col space-y-4">
           <div className="text-red-500 p-4">{error}</div>
           <div className="mt-4 text-center">
-            <a 
-              href={`http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline"
+            <button 
+              onClick={() => window.open(`/api/proxy/file-storage/download/${fileId}?preview=true`, '_blank')}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
-              Abrir archivo directamente en una nueva pestaña
-            </a>
+              Abrir en nueva pestaña
+            </button>
           </div>
         </div>
       );
@@ -1206,7 +1219,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       return <img src={objectUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
     }
     
-    // For PDFs and other files
+    // For PDFs - use our dedicated PDFViewer component
+    if (fileType === 'application/pdf') {
+      return <PDFViewer fileUrl={objectUrl} height="600px" />;
+    }
+    
+    // For other file types
     return (
       <iframe 
         src={objectUrl} 
