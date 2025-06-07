@@ -21,21 +21,35 @@ public class CorsFilter implements Filter {
         HttpServletRequest request = (HttpServletRequest) req;
         
         String origin = request.getHeader("Origin");
+        String authHeader = request.getHeader("Authorization");
         
-        // CRITICAL: Set CORS headers BEFORE any processing
-        // When allowCredentials is true, we must reflect the actual origin instead of using *
+        System.out.println("=== CORS FILTER DEBUG ===");
+        System.out.println("URI: " + request.getRequestURI());
+        System.out.println("Method: " + request.getMethod());
+        System.out.println("Origin: " + (origin != null ? origin : "null"));
+        System.out.println("Auth Header Present: " + (authHeader != null ? "yes" : "no"));
+        
+        // For direct browser requests (no origin header), be permissive
         if (origin != null) {
+            // For requests with Origin header, reflect the origin
+            System.out.println("Origin header found, reflecting: " + origin);
             response.setHeader("Access-Control-Allow-Origin", origin);
+            
+            // If auth header is present, credentials might be needed
+            if (authHeader != null) {
+                System.out.println("Auth header present, enabling credentials");
+                response.setHeader("Access-Control-Allow-Credentials", "true");
+            } else {
+                System.out.println("No auth header, disabling credentials");
+                response.setHeader("Access-Control-Allow-Credentials", "false");
+            }
         } else {
-            // For requests without Origin header, you can either:
-            // 1. Set a default origin
-            response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-            // 2. Or use * but then disable credentials
-            // response.setHeader("Access-Control-Allow-Origin", "*");
-            // response.setHeader("Access-Control-Allow-Credentials", "false");
+            // For direct browser access without Origin header
+            System.out.println("No origin header, using wildcard for direct browser access");
+            response.setHeader("Access-Control-Allow-Origin", "*");
+            response.setHeader("Access-Control-Allow-Credentials", "false");
         }
         
-        response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH");
         response.setHeader("Access-Control-Max-Age", "3600");
         response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-CSRF-Token");
@@ -54,19 +68,14 @@ public class CorsFilter implements Filter {
         response.setHeader("X-Debug-Method", request.getMethod());
         response.setHeader("X-Debug-URI", request.getRequestURI());
         
-        // Log for debugging
-        System.out.println("=== CORS FILTER DEBUG ===");
-        System.out.println("URI: " + request.getRequestURI());
-        System.out.println("Method: " + request.getMethod());
-        System.out.println("Origin: " + (origin != null ? origin : "null"));
-        
         // Print all request headers for debugging
         java.util.Enumeration<String> headerNames = request.getHeaderNames();
+        System.out.println("------ All Request Headers ------");
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
             System.out.println("Header: " + headerName + " = " + request.getHeader(headerName));
         }
-        System.out.println("========================");
+        System.out.println("------ End Headers ------");
         
         // Handle preflight OPTIONS requests
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -74,6 +83,9 @@ public class CorsFilter implements Filter {
             response.setStatus(HttpServletResponse.SC_OK);
             return; // Don't continue the filter chain for OPTIONS
         }
+        
+        System.out.println("Continuing filter chain for " + request.getMethod() + " request");
+        System.out.println("========================");
         
         // Continue with the request
         chain.doFilter(req, res);

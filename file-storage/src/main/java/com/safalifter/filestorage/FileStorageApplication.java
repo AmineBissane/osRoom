@@ -20,6 +20,16 @@ public class FileStorageApplication {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
+                // First, add a permissive configuration for direct browser access
+                registry.addMapping("/api/v1/file-storage/download/**")
+                        .allowedOrigins("*")
+                        .allowedMethods("GET", "HEAD", "OPTIONS")
+                        .allowedHeaders("*")
+                        .exposedHeaders("Content-Disposition", "Content-Type", "Content-Length")
+                        .allowCredentials(false)
+                        .maxAge(3600);
+                
+                // Then, add a more strict configuration for authenticated requests
                 registry.addMapping("/**")
                         .allowedOriginPatterns("*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")

@@ -45,10 +45,28 @@ public class StorageController {
                                          @RequestHeader(value = "Authorization", required = false) String authHeader,
                                          @RequestHeader(value = "Origin", required = false) String origin) {
         try {
+            System.out.println("============ DOWNLOAD REQUEST DEBUG ============");
             System.out.println("Download request for file ID: " + id);
             System.out.println("Preview mode: " + preview);
             System.out.println("Auth header present: " + (authHeader != null ? "yes" : "no"));
             System.out.println("Origin: " + (origin != null ? origin : "null"));
+            
+            // Log all request headers for debugging
+            System.out.println("------ All Request Headers ------");
+            Map<String, String> headerMap = new HashMap<>();
+            org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()
+                .getAttribute("org.springframework.web.servlet.HandlerMapping.uriTemplateVariables", 0);
+            
+            javax.servlet.http.HttpServletRequest request = 
+                ((org.springframework.web.context.request.ServletRequestAttributes) 
+                org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest();
+            
+            java.util.Enumeration<String> headerNames = request.getHeaderNames();
+            while (headerNames.hasMoreElements()) {
+                String headerName = headerNames.nextElement();
+                System.out.println(headerName + ": " + request.getHeader(headerName));
+            }
+            System.out.println("------ End Headers ------");
             
             var fileData = storageService.downloadFile(id);
             String contentType = determineContentType(fileData.getFileName(), fileData.getContentType());
@@ -56,22 +74,34 @@ public class StorageController {
             // Log content type for debugging
             System.out.println("Content type: " + contentType);
             System.out.println("File size: " + fileData.getData().length + " bytes");
+            System.out.println("File name: " + fileData.getFileName());
             
             // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
             
             // When credentials are true, we must reflect the actual origin
             if (origin != null) {
+                System.out.println("Setting Access-Control-Allow-Origin to: " + origin);
                 headers.add("Access-Control-Allow-Origin", origin);
             } else {
-                headers.add("Access-Control-Allow-Origin", "http://localhost:3000");
+                System.out.println("No origin header, setting default origin to: http://localhost:3000");
+                // For direct browser access, we need to be more permissive
+                headers.add("Access-Control-Allow-Origin", "*");
             }
             
             headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD");
             headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
             headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
             headers.add("Access-Control-Max-Age", "3600");
-            headers.add("Access-Control-Allow-Credentials", "true");
+            
+            // For direct browser access without credentials, we can use "*"
+            if (authHeader == null) {
+                System.out.println("No auth header, setting Access-Control-Allow-Credentials to false");
+                headers.add("Access-Control-Allow-Credentials", "false");
+            } else {
+                System.out.println("Auth header present, setting Access-Control-Allow-Credentials to true");
+                headers.add("Access-Control-Allow-Credentials", "true");
+            }
             
             // Set content type based on file extension and detected type
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
@@ -81,14 +111,17 @@ public class StorageController {
             
             // Set disposition based on preview flag
             if (preview) {
+                System.out.println("Preview mode, setting Content-Disposition to inline");
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileData.getFileName() + "\"");
                 
                 // For PDFs, add special headers to improve browser rendering
                 if (contentType.equals("application/pdf")) {
+                    System.out.println("PDF detected, adding special headers for browser rendering");
                     headers.add("X-Content-Type-Options", "nosniff");
                     headers.add("Accept-Ranges", "bytes");
                 }
             } else {
+                System.out.println("Download mode, setting Content-Disposition to attachment");
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileData.getFileName() + "\"");
             }
             
@@ -99,6 +132,14 @@ public class StorageController {
             
             // Allow embedding in iframe
             headers.add("X-Frame-Options", "SAMEORIGIN");
+            
+            // Log all response headers for debugging
+            System.out.println("------ All Response Headers ------");
+            headers.forEach((key, value) -> {
+                System.out.println(key + ": " + value);
+            });
+            System.out.println("------ End Headers ------");
+            System.out.println("============ END DEBUG ============");
             
             // Special handling for text files
             if (isTextFile(contentType)) {
@@ -124,12 +165,12 @@ public class StorageController {
             if (origin != null) {
                 headers.add("Access-Control-Allow-Origin", origin);
             } else {
-                headers.add("Access-Control-Allow-Origin", "http://localhost:3000");
+                headers.add("Access-Control-Allow-Origin", "*");
             }
             
             headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
             headers.add("Access-Control-Allow-Headers", "*");
-            headers.add("Access-Control-Allow-Credentials", "true");
+            headers.add("Access-Control-Allow-Credentials", "false");
             
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to download file: " + e.getMessage());
