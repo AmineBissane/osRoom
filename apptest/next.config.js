@@ -35,8 +35,8 @@ const nextConfig = {
         destination: 'http://82.29.168.17:8222/api/v1/:path*',
       },
       {
-        source: '/api/activitiesresponses/grade/:id',
-        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/:id/grade',
+        source: '/api/activitiesresponses/grade/:activityId',
+        destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/:activityId/grade',
       },
       {
         source: '/api/activitiesresponses/student/:studentId',
@@ -47,8 +47,8 @@ const nextConfig = {
         destination: 'http://82.29.168.17:8222/api/v1/activitiesresponses/activity/:activityId/student/:studentId',
       },
       {
-        source: '/api/activities/:id',
-        destination: 'http://82.29.168.17:8222/api/v1/activities/:id',
+        source: '/api/activities/:activityId',
+        destination: 'http://82.29.168.17:8222/api/v1/activities/:activityId',
       },
       // Add a catch-all rule for activitiesresponses routes
       {

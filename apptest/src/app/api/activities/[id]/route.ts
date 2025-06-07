@@ -107,68 +107,60 @@ export async function DELETE(
 // GET endpoint to fetch activity details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
-    const { id } = await params;
+    // Use await to access params (this is just a pattern to satisfy Next.js warning)
+    const { activityId } = await Promise.resolve(params);
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
-    const refreshTokenValue = request.cookies.get('refresh_token')?.value;
     
-    // Also check for Authorization header in case token is passed that way
-    const authHeader = request.headers.get('authorization');
-    const tokenFromHeader = authHeader ? authHeader.replace('Bearer ', '') : null;
-    
-    // Use token from cookie or header
-    const accessToken = token || tokenFromHeader;
-
-    if (!accessToken) {
+    if (!token) {
       return NextResponse.json(
         { error: 'No authentication token found' },
         { status: 401 }
-      )
+      );
     }
-
-    console.log(`Fetching activity with ID: ${id} through Next.js API route`)
-
-    // Make request to backend API
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${id}`
+    
+    console.log(`Proxying request for activity: ${activityId}`);
+    
+    // Ensure token is properly formatted
+    const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    
+    // Make the request to the gateway
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${activityId}`;
+    console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': cleanToken,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': 'http://82.29.168.17:3000'
-      },
-      credentials: 'include'
-    })
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch activity: ${response.status}` },
-        { status: response.status }
-      )
-    }
-
-    const data = await response.json()
-    
-    return NextResponse.json(data, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Accept': 'application/json'
       }
-    })
+    });
+    
+    console.log(`Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      // Forward the error status and message
+      return NextResponse.json(
+        { error: `Gateway returned status: ${response.status}` },
+        { status: response.status }
+      );
+    }
+    
+    // Get the response data
+    const data = await response.json();
+    
+    // Return the data
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('API error:', error)
+    console.error('Proxy error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch activity', details: error instanceof Error ? error.message : String(error) },
+      { error: 'Failed to fetch activity from gateway' },
       { status: 500 }
-    )
+    );
   }
 } 
