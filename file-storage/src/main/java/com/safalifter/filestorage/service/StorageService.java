@@ -131,7 +131,7 @@ public class StorageService {
         }
     }
 
-    private File findFileById(String id) {
+    public File findFileById(String id) {
         return fileRepository.findById(id).orElseThrow(() ->
                 new RuntimeException("File not found with id: " + id));
     }

@@ -1,5 +1,6 @@
 package com.safalifter.filestorage.controller;
 
+import com.safalifter.filestorage.model.File;
 import com.safalifter.filestorage.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -9,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.safalifter.filestorage.model.FileData;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("api/v1/file-storage")
@@ -44,5 +47,17 @@ public class StorageController {
     public ResponseEntity<Void> deleteFileFromFileSystem(@PathVariable String id) {
         storageService.deleteFile(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/metadata")
+    public ResponseEntity<Map<String, Object>> getFileMetadata(@PathVariable String id) {
+        File fileRecord = storageService.findFileById(id);
+        
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("id", fileRecord.getId());
+        metadata.put("fileName", fileRecord.getOriginalFileName());
+        metadata.put("contentType", fileRecord.getType());
+        
+        return ResponseEntity.ok(metadata);
     }
 }
