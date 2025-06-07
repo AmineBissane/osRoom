@@ -108,69 +108,94 @@ export default function DirectFileViewer({
         }
       }
       
-      // Fetch the file data directly
-      const response = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache'
+      // Add a timeout to handle connection reset issues
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      try {
+        // Fetch the file data directly
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load file: ${response.status}`);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load file: ${response.status}`);
-      }
-      
-      // Get the content type and file name
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
-      const contentDisposition = response.headers.get('content-disposition');
-      setFileType(contentType);
-      
-      // Extract filename from content-disposition if available
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (filenameMatch && filenameMatch[1]) {
-          const extractedName = filenameMatch[1];
-          setFileName(extractedName);
-          
-          if (isNonViewableExtension(extractedName)) {
-            setFileTypeName(getFileTypeFromName(extractedName));
-            setIsNonViewableFile(true);
-            setLoading(false);
-            setApproach('buttons');
-            return false;
+        
+        // Get the content type and file name
+        const contentType = response.headers.get('content-type') || 'application/octet-stream';
+        const contentDisposition = response.headers.get('content-disposition');
+        setFileType(contentType);
+        
+        // Extract filename from content-disposition if available
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+          if (filenameMatch && filenameMatch[1]) {
+            const extractedName = filenameMatch[1];
+            setFileName(extractedName);
+            
+            if (isNonViewableExtension(extractedName)) {
+              setFileTypeName(getFileTypeFromName(extractedName));
+              setIsNonViewableFile(true);
+              setLoading(false);
+              setApproach('buttons');
+              return false;
+            }
           }
         }
-      }
-      
-      // Check if it's a non-viewable MIME type
-      const nonViewableMimeTypes = [
-        'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
-        'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
-        'application/java-archive'
-      ];
-      
-      if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
-        if (!fileName) {
-          const inferredName = fileId.split('/').pop() || 'archivo';
-          setFileName(inferredName);
-          setFileTypeName(contentType.split('/').pop() || 'archivo');
+        
+        // Check if it's a non-viewable MIME type
+        const nonViewableMimeTypes = [
+          'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
+          'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
+          'application/java-archive'
+        ];
+        
+        if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
+          if (!fileName) {
+            const inferredName = fileId.split('/').pop() || 'archivo';
+            setFileName(inferredName);
+            setFileTypeName(contentType.split('/').pop() || 'archivo');
+          }
+          setIsNonViewableFile(true);
+          setLoading(false);
+          setApproach('buttons');
+          return false;
         }
-        setIsNonViewableFile(true);
+        
+        // Create a blob URL for the content
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        setObjectUrl(blobUrl);
         setLoading(false);
-        setApproach('buttons');
-        return false;
+        
+        return true;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        // Check for connection reset and abort errors
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.error('Fetch request timed out');
+          throw new Error('La conexión al servidor tardó demasiado tiempo. Intente nuevamente.');
+        } else if (fetchError instanceof Error && 
+          (fetchError.message.includes('connection reset') || fetchError.message.includes('network error'))) {
+          console.error('Connection reset error:', fetchError);
+          throw new Error('Error de conexión con el servidor. Intente nuevamente más tarde.');
+        } else {
+          throw fetchError;
+        }
       }
-      
-      // Create a blob URL for the content
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      setObjectUrl(blobUrl);
-      setLoading(false);
-      
-      return true;
     } catch (err) {
       console.error('Error in blob approach:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido al cargar el archivo');
+      setApproach('buttons');
+      setLoading(false);
       return false;
     }
   };
@@ -185,45 +210,51 @@ export default function DirectFileViewer({
     
     const loadFile = async () => {
       // Step 1: Try the blob approach first
-      setApproach('blob');
-      const blobSuccess = await loadFileBlob();
-      
-      if (blobSuccess) {
-        // Also fetch direct link as fallback
-        await fetchDirectLink();
-        return;
-      }
-      
-      if (isNonViewableFile) {
-        // No need to try other approaches for non-viewable files
-        return;
-      }
-      
-      // Step 2: If blob failed, switch to iframe approach
-      setApproach('iframe');
-      setLoading(true);
-      
-      // Generate a direct URL to the file
-      const timestamp = new Date().getTime();
-      const iframeSrc = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
-      setObjectUrl(iframeSrc);
-      
-      // Give iframe a chance to load
-      setTimeout(() => {
-        if (loading) {
-          // Try to get direct link as final fallback
-          fetchDirectLink().then(link => {
-            if (link) {
-              setApproach('direct');
-              setError('Try opening the file directly');
-            } else {
-              setError('Failed to load file. Try refreshing.');
-              setApproach('buttons');
-            }
-            setLoading(false);
-          });
+      try {
+        setApproach('blob');
+        const blobSuccess = await loadFileBlob();
+        
+        if (blobSuccess) {
+          // Also fetch direct link as fallback
+          await fetchDirectLink();
+          return;
         }
-      }, 5000);
+        
+        if (isNonViewableFile) {
+          // No need to try other approaches for non-viewable files
+          return;
+        }
+        
+        // Step 2: If blob failed, try the direct link approach
+        const directLink = await fetchDirectLink();
+        if (directLink && directLink.directAccessUrl) {
+          setApproach('direct');
+          return;
+        }
+        
+        // Step 3: As last resort, try iframe approach
+        setApproach('iframe');
+        setLoading(true);
+        
+        // Generate a direct URL to the file
+        const timestamp = new Date().getTime();
+        const iframeSrc = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
+        setObjectUrl(iframeSrc);
+        
+        // Give iframe a chance to load
+        setTimeout(() => {
+          if (loading) {
+            setError('No se pudo cargar el archivo. Intente descargarlo o abrirlo en una nueva pestaña.');
+            setApproach('buttons');
+            setLoading(false);
+          }
+        }, 10000);
+      } catch (error) {
+        console.error('Error loading file:', error);
+        setError('Error al cargar el archivo. Intente usar los botones alternativos.');
+        setApproach('buttons');
+        setLoading(false);
+      }
     };
 
     loadFile();
@@ -234,7 +265,7 @@ export default function DirectFileViewer({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [fileId, loading, isNonViewableFile]);
+  }, [fileId, retryCount]);  // Add retryCount to dependencies so we can trigger a reload
 
   // Handle reload attempts
   const reloadFile = async () => {
