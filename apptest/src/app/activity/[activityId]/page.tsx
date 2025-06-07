@@ -989,6 +989,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [fileType, setFileType] = useState<string | null>(null);
+    const [textContent, setTextContent] = useState<string | null>(null);
     
     useEffect(() => {
       const loadPreview = async () => {
@@ -1008,17 +1009,53 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             if (metadataResponse.ok) {
               const metadata = await metadataResponse.json();
               setFileType(metadata.contentType);
+              
+              // If it's a text file, fetch the content
+              if (metadata.contentType?.startsWith('text/') || 
+                  metadata.contentType === 'application/json' ||
+                  metadata.contentType === 'application/javascript' ||
+                  metadata.contentType === 'application/xml' ||
+                  metadata.contentType === 'application/x-yaml') {
+                const textResponse = await fetch(previewUrl);
+                if (textResponse.ok) {
+                  const text = await textResponse.text();
+                  setTextContent(text);
+                }
+              }
             } else {
-              // If metadata fails, we'll try to detect type from preview response
+              // If metadata fails, try to detect type from preview response
               const previewResponse = await fetch(previewUrl, { method: 'HEAD' });
               const contentType = previewResponse.headers.get('content-type');
               if (contentType) {
                 setFileType(contentType);
+                
+                // If it's a text file, fetch the content
+                if (contentType.startsWith('text/') || 
+                    contentType === 'application/json' ||
+                    contentType === 'application/javascript' ||
+                    contentType === 'application/xml' ||
+                    contentType === 'application/x-yaml') {
+                  const textResponse = await fetch(previewUrl);
+                  if (textResponse.ok) {
+                    const text = await textResponse.text();
+                    setTextContent(text);
+                  }
+                }
               }
             }
           } catch (err) {
             console.warn('Could not determine file type:', err);
-            // Continue without file type - we'll show generic preview
+            // Try to load as text by default
+            try {
+              const textResponse = await fetch(previewUrl);
+              if (textResponse.ok) {
+                const text = await textResponse.text();
+                setTextContent(text);
+                setFileType('text/plain');
+              }
+            } catch (textErr) {
+              console.error('Failed to load as text:', textErr);
+            }
           }
           
         } catch (err) {
@@ -1106,6 +1143,16 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               sandbox="allow-same-origin allow-scripts"
               onError={() => setError('Error al cargar el PDF')}
             />
+          ) : (fileType?.startsWith('text/') || 
+              fileType === 'application/json' ||
+              fileType === 'application/javascript' ||
+              fileType === 'application/xml' ||
+              fileType === 'application/x-yaml') ? (
+            <div className="p-4 max-h-[400px] overflow-auto">
+              <pre className="whitespace-pre-wrap break-words text-sm font-mono">
+                {textContent || 'No se pudo cargar el contenido del archivo'}
+              </pre>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-[400px] gap-4">
               <FileText className="h-16 w-16 text-muted-foreground" />
