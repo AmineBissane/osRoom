@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
-    const { id } = params;
+    const { activityId } = params;
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
@@ -20,13 +20,13 @@ export async function POST(
     // Get the request body
     const body = await request.json();
     
-    console.log(`Proxying grade submission for response: ${id}`);
+    console.log(`Proxying grade submission for response: ${activityId}`);
     
     // Ensure token is properly formatted
     const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     
     // Make the request to the gateway
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`;
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${activityId}/grade`;
     console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {

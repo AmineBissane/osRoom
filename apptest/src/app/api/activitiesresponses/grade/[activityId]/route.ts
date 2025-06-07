@@ -18,11 +18,11 @@ const decodeJwt = (token: string) => {
 // Handle OPTIONS requests for CORS preflight
 export async function OPTIONS(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   // Await params to avoid Next.js warnings
-  const id = await params.id;
-  console.log(`OPTIONS request for grade endpoint with ID: ${id}`);
+  const activityId = await params.activityId;
+  console.log(`OPTIONS request for grade endpoint with ID: ${activityId}`);
   
   return new NextResponse(null, {
     status: 204,
@@ -38,11 +38,11 @@ export async function OPTIONS(
 // POST endpoint to save grade for an activity response
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
     // Ensure we properly await the params to avoid Next.js warnings
-    const id = await params.id;
+    const activityId = await params.activityId;
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
@@ -61,7 +61,7 @@ export async function POST(
       )
     }
 
-    console.log(`Saving grade for activity response ID: ${id} through Next.js API route`)
+    console.log(`Saving grade for activity response ID: ${activityId} through Next.js API route`)
 
     // Get the grade from the request body
     const { grade } = await request.json();
@@ -74,7 +74,7 @@ export async function POST(
     }
 
     // Make request to backend API with all necessary details
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${id}/grade`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/${activityId}/grade`
     console.log(`Making request to: ${apiUrl}`)
     console.log(`Grade value: ${grade}`)
     console.log(`Token (first 30 chars): ${accessToken.substring(0, 30)}...`)
