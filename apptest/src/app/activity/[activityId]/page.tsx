@@ -28,30 +28,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-// Add CORS disable script for direct API access
-useEffect(() => {
-  // Create a script element to disable CORS in the iframe
-  const script = document.createElement('script');
-  script.innerHTML = `
-    // Override fetch to add credentials
-    const originalFetch = window.fetch;
-    window.fetch = function(url, options = {}) {
-      options.credentials = 'include';
-      options.mode = 'cors';
-      return originalFetch(url, options);
-    };
-  `;
-  
-  // Add the script to the head
-  document.head.appendChild(script);
-  
-  return () => {
-    // Clean up
-    if (script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-  };
-}, []);
+// CORS handling is now done directly in the component
 
 interface Activity {
   id: number | string;
@@ -1151,6 +1128,38 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       setError('Error al cargar el archivo');
       setLoading(false);
     };
+    
+    // Add CORS handling script
+    useEffect(() => {
+      // Only run in browser
+      if (typeof window === 'undefined') return;
+      
+      try {
+        // Create a script element to disable CORS in the iframe
+        const script = document.createElement('script');
+        script.innerHTML = `
+          // Override fetch to add credentials
+          const originalFetch = window.fetch;
+          window.fetch = function(url, options = {}) {
+            options.credentials = 'include';
+            options.mode = 'cors';
+            return originalFetch(url, options);
+          };
+        `;
+        
+        // Add the script to the head
+        document.head.appendChild(script);
+        
+        return () => {
+          // Clean up
+          if (script.parentNode) {
+            script.parentNode.removeChild(script);
+          }
+        };
+      } catch (err) {
+        console.error('Error setting up CORS handling:', err);
+      }
+    }, []);
     
     // Set a timeout to handle cases where the iframe doesn't load
     useEffect(() => {
