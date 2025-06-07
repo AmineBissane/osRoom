@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,12 +15,7 @@ import {
   XCircle,
   Loader2,
   ArrowLeft,
-  Users,
-  User,
   Clock,
-  Save,
-  Trash2,
-  AlertTriangle,
   CheckCircle2,
   Paperclip,
 } from "lucide-react"
@@ -29,25 +24,6 @@ import { es } from "date-fns/locale"
 import { fetchWithAuth, getCurrentUsername } from '@/utils/fetchWithAuth'
 import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import React from "react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 
 interface Activity {
@@ -96,41 +72,7 @@ const decodeJwt = (token: string) => {
 };
 
 // GradeInput component for grading
-const GradeInput = ({ 
-  value, 
-  onChange, 
-  onSave, 
-  disabled 
-}: { 
-  value: string; 
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; 
-  onSave: () => void; 
-  disabled: boolean;
-}) => {
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        type="number"
-        placeholder="Calificación (0-10)"
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        min="0"
-        max="10"
-        step="0.1"
-        className="flex-1"
-      />
-      <Button 
-        variant="default" 
-        onClick={onSave}
-        disabled={disabled}
-      >
-        <Save className="h-4 w-4 mr-2" />
-        Guardar
-      </Button>
-    </div>
-  );
-};
+const GradeInput = () => null;
 
 // Componente envolvente para evitar recargas
 const StableContainer = React.memo(({ children }: { children: React.ReactNode }) => {
@@ -226,25 +168,14 @@ if (typeof window !== 'undefined') {
 }
 
 export default function ActivityPage({ params }: { params: { id: string } }) {
-  // Access params directly since we're in a client component
-  // In the future this will need to be updated to use React.use with proper setup
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Estados para manejar la carga de datos
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<Activity | null>(null);
-  const [responses, setResponses] = useState<ActivityResponse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [viewResponses, setViewResponses] = useState(false);
-  const [isTeacher, setIsTeacher] = useState(false);
-  const [loadingResponses, setLoadingResponses] = useState(false);
-  const [selectedResponse, setSelectedResponse] = useState<ActivityResponse | null>(null);
-  const [isGrading, setIsGrading] = useState(false);
-  const [gradeInput, setGradeInput] = useState<string>("");
   const [userHasSubmitted, setUserHasSubmitted] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [submissionError, setSubmissionError] = useState<string>("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -256,9 +187,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [activityId, setActivityId] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [gradeValue, setGradeValue] = useState('');
-  const [viewingResponse, setViewingResponse] = useState<ActivityResponse | null>(null);
-  const [isExpandedView, setIsExpandedView] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   // Initialize activityId from params when component mounts
@@ -267,23 +195,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     if (params && params.id) {
       console.log("Setting activity ID from params:", params.id);
       setActivityId(params.id);
-      
-      // For testing: force teacher mode if URL has ?teacher=1
-      if (typeof window !== 'undefined' && window.location.search.includes('teacher=1')) {
-        console.log('Forcing teacher mode for testing');
-        setIsTeacher(true);
-      }
     } else {
       console.error("No activity ID found in params");
       setError("No se pudo cargar la actividad: ID no encontrado");
     }
     setInitializing(false);
   }, [params]);
-
-  // Add logging when teacher state changes
-  useEffect(() => {
-    console.log('isTeacher state updated:', isTeacher);
-  }, [isTeacher]);
 
   // Check authentication status and ensure token validity
   useEffect(() => {
@@ -296,9 +213,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (!token) {
         console.error("No authentication token found");
         setAuthError("No se encontró un token de autenticación válido. Por favor, inicie sesión nuevamente.");
-        setIsLoading(false); // Make sure to clear loading state
+        setIsLoading(false);
         
-        // Delay redirect slightly to ensure state updates
         setTimeout(() => {
           window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
         }, 100);
@@ -306,51 +222,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       try {
-        // Check if user is a teacher based on token roles
-        const decoded = decodeJwt(token);
-        console.log('Decoded token:', decoded);
-        
-        if (decoded) {
-          // Check for teacher role in different possible formats
-          let isUserTeacher = false;
-          
-          // Check realm_access.roles (Keycloak format)
-          if (decoded.realm_access && Array.isArray(decoded.realm_access.roles)) {
-            isUserTeacher = decoded.realm_access.roles.some((role: string) => 
-              ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
-            );
-          }
-          
-          // Check roles array (common format)
-          if (!isUserTeacher && Array.isArray(decoded.roles)) {
-            isUserTeacher = decoded.roles.some((role: string) => 
-              ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
-            );
-          }
-          
-          // Check resource_access (another Keycloak format)
-          if (!isUserTeacher && decoded.resource_access) {
-            Object.keys(decoded.resource_access).forEach(client => {
-              if (decoded.resource_access[client] && Array.isArray(decoded.resource_access[client].roles)) {
-                if (decoded.resource_access[client].roles.some((role: string) => 
-                  ['teacher', 'TEACHER', 'ROLE_TEACHER'].includes(role)
-                )) {
-                  isUserTeacher = true;
-                }
-              }
-            });
-          }
-          
-          console.log('User is teacher:', isUserTeacher);
-          setIsTeacher(isUserTeacher);
-        }
-        
-        // Also check if the URL has ?teacher=1 for testing
-        if (typeof window !== 'undefined' && window.location.search.includes('teacher=1')) {
-          console.log('Forcing teacher mode for testing via URL parameter');
-          setIsTeacher(true);
-        }
-        
         // Verify token by making a simple API call
         const response = await fetch('/api/auth/check', {
           headers: { 
@@ -362,16 +233,15 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         if (!response.ok) {
           console.error("Token validation failed");
           setAuthError("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
-          setIsLoading(false); // Make sure to clear loading state
+          setIsLoading(false);
           
-          // Delay redirect slightly to ensure state updates
           setTimeout(() => {
             window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
           }, 100);
         }
       } catch (error) {
         console.error("Error checking authentication:", error);
-        setIsLoading(false); // Make sure to clear loading state
+        setIsLoading(false);
       }
     };
     
@@ -836,51 +706,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   };
   
   // Function to handle activity deletion
-  const handleDeleteActivity = async () => {
-    try {
-      setIsDeleting(true);
-      console.log(`Intentando eliminar actividad con ID: ${activityId}`);
-      
-      // Obtener el token
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_token='))
-        ?.split('=')[1];
-          
-      if (!token) {
-        throw new Error('No se encontró el token de autenticación');
-      }
-      
-      const directResponse = await fetch(`http://82.29.168.17:8222/api/v1/activities/${activityId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Origin': 'http://82.29.168.17:3000'
-        },
-      });
-      
-      if (!directResponse.ok) {
-        const errorText = await directResponse.text();
-        console.error('Error en la respuesta de la solicitud directa:', errorText);
-        throw new Error(`Error al eliminar la actividad: ${directResponse.status}`);
-      }
-      
-      toast.success('Actividad eliminada correctamente');
-      
-      // Navegar de vuelta a la lista de actividades
-      setTimeout(() => {
-        router.push('/');
-      }, 500);
-      
-    } catch (error) {
-      console.error('Error al eliminar la actividad:', error);
-      toast.error(`Error al eliminar la actividad: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteConfirmation(false);
-    }
-  };
+  const handleDeleteActivity = () => {};
 
   // Function to submit a response with a file
   const handleSubmitWithFile = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -892,7 +718,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       // Check if user has already submitted first
       const hasSubmitted = await checkUserSubmission(activityId);
       if (hasSubmitted) {
-        // El mensaje de error ya se muestra en checkUserSubmission
         setIsSubmitting(false);
         return;
       }
@@ -1002,10 +827,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       // Guardar estado en localStorage
       saveSubmissionState();
       
-      // Reload student responses if we're viewing them
-      if (viewResponses) {
-        fetchAllResponses();
-      }
     } catch (error) {
       console.error('Error al enviar la respuesta:', error);
       setSubmissionError(`Error al enviar: ${error instanceof Error ? error.message : String(error)}`);
@@ -1073,150 +894,19 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   };
 
   // Function to fetch all responses for an activity (for teachers)
-  const fetchAllResponses = async () => {
-    if (!activityId) return;
-    
-    setLoadingResponses(true);
-    
-    try {
-      // Add cache-busting timestamp
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/proxy/activitiesresponses/activity/${activityId}?_=${timestamp}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error fetching responses: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Responses data:', data);
-      setResponses(data);
-    } catch (error) {
-      console.error('Error fetching all responses:', error);
-      toast.error('Error al cargar las respuestas');
-      // Clear responses in case of error
-      setResponses([]);
-    } finally {
-      // Always clear loading state
-      setLoadingResponses(false);
-    }
-  };
+  const fetchAllResponses = () => {};
 
   // Function to handle viewing all responses (for teachers)
-  const handleViewResponses = () => {
-    setViewResponses(true);
-    fetchAllResponses();
-  };
+  const handleViewResponses = () => {};
 
   // Function to view a specific response detail
-  const handleViewResponseDetail = (response: ActivityResponse) => {
-    setSelectedResponse(response);
-    setIsGrading(true);
-    
-    // If the response already has a grade, pre-fill the input
-    if (response.grade !== undefined && response.grade !== null) {
-      setGradeInput(response.grade.toString());
-    } else {
-      setGradeInput("");
-    }
-  };
+  const handleViewResponseDetail = () => {};
 
   // Function to handle grade input change
-  const handleGradeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    
-    // Only allow numbers between 0 and 10
-    if (value === '' || (/^\d+(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 10)) {
-      setGradeInput(value);
-    }
-  };
+  const handleGradeInputChange = () => {};
 
   // Function to save a grade for a response
-  const saveGrade = async () => {
-    if (!selectedResponse) return;
-    
-    try {
-      // Add validation
-      const gradeValue = parseFloat(gradeInput);
-      if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 10) {
-        toast.error('La calificación debe ser un número entre 0 y 10');
-        return;
-      }
-      
-      // Get user info from token
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_token='))
-        ?.split('=')[1];
-        
-      if (!token) {
-        throw new Error('No se encontró el token de autenticación');
-      }
-      
-      // Decode token to get grader info
-      const decodedToken = decodeJwt(token);
-      if (!decodedToken) {
-        throw new Error('No se pudo decodificar el token');
-      }
-      
-      const graderId = decodedToken.sub || '';
-      const graderName = decodedToken.name || decodedToken.preferred_username || 'Unknown User';
-      
-      // Create payload for grade update
-      const payload = {
-        id: selectedResponse.id,
-        grade: gradeValue,
-        gradedBy: graderName,
-        gradedAt: new Date().toISOString()
-      };
-      
-      // Save the grade via API
-      const timestamp = new Date().getTime();
-      const response = await fetch(`/api/proxy/activitiesresponses/${selectedResponse.id}?_=${timestamp}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error saving grade: ${response.status}`);
-      }
-      
-      toast.success('Calificación guardada correctamente');
-      
-      // Update local state
-      const updatedResponse = {
-        ...selectedResponse,
-        grade: gradeValue,
-        gradedBy: graderName,
-        gradedAt: new Date().toISOString()
-      };
-      
-      setSelectedResponse(updatedResponse);
-      
-      // Update in the responses list
-      setResponses(responses.map(r => 
-        r.id === selectedResponse.id ? updatedResponse : r
-      ));
-      
-      // Close the grading dialog after a short delay
-      setTimeout(() => {
-        setIsGrading(false);
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error al guardar la calificación:', error);
-      toast.error(`Error al guardar la calificación: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
+  const saveGrade = () => {};
 
   // Function to get a file URL for download or preview
   const getFileUrl = (fileId: string | undefined): string => {
@@ -1257,14 +947,13 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             throw new Error('No file ID provided');
           }
           
-          // Use our proxy API endpoint instead of direct connection to avoid CORS issues
-          const url = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          // Create direct preview URL
+          const url = `/api/proxy/file-storage/download/${fileId}`;
           setPreviewUrl(url);
           
-          // Also try to pre-fetch to check if the file is accessible
+          // Check if file is accessible
           const checkResponse = await fetch(url, { method: 'HEAD' });
           if (!checkResponse.ok) {
-            console.error('File preview check failed:', checkResponse.status);
             throw new Error('No se pudo acceder al archivo');
           }
           
@@ -1329,58 +1018,24 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           </div>
         )}
         <div className="border rounded-md overflow-hidden">
-          <iframe 
-            src={previewUrl} 
-            className="w-full h-[400px]" 
-            title="Vista previa" 
-            sandbox="allow-scripts allow-same-origin"
-            referrerPolicy="no-referrer"
-          />
+          <object 
+            data={previewUrl} 
+            type="application/pdf"
+            className="w-full h-[400px]"
+          >
+            <iframe 
+              src={previewUrl}
+              className="w-full h-[400px]" 
+              title="Vista previa"
+            />
+          </object>
         </div>
       </div>
     );
   };
 
   // Response card component to display in the list
-  const ResponseCard = ({ response, onViewDetails }: { 
-    response: ActivityResponse, 
-    onViewDetails: (response: ActivityResponse) => void 
-  }) => {
-    return (
-      <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
-        <CardContent className="p-0">
-          <div className="p-4 border-b">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-medium truncate">{response.studentName}</h3>
-              {response.grade !== undefined && response.grade !== null ? (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  {response.grade}/10
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                  Pendiente
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Enviado: {response.createdAt ? formatDateTime(response.createdAt) : 'No disponible'}
-            </p>
-          </div>
-          <div className="p-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="w-full"
-              onClick={() => onViewDetails(response)}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Ver Detalles
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
+  const ResponseCard = () => null;
 
   // Add safety timeout for loading state
   useEffect(() => {
@@ -1457,7 +1112,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       activityId,
       initializing,
       isLoading,
-      loadingResponses,
+      loadingResponses: false,
       userHasSubmitted,
       params: params ? { id: params.id } : null,
       userId: getCurrentUserId(),
@@ -1498,7 +1153,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         console.log('Safety timeout triggered to clear loading states');
         setLoading(false);
         setIsLoading(false);
-        setLoadingResponses(false);
       }
     }, 20000);
     
@@ -1525,7 +1179,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             <button 
               onClick={() => { 
                 setIsLoading(false);
-                setError(null); // Don't show error message, just stop loading
+                setError(null);
               }}
               className="mt-4 text-sm text-primary underline"
             >
@@ -1557,322 +1211,239 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         </div>
       ) : activity ? (
         <StableContainer>
-        <div className="container py-6 space-y-6">
+          <div className="container py-6 space-y-6">
             <div className="flex justify-between items-center mb-4">
-          <Button 
-            variant="outline" 
-            onClick={() => router.back()}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          
-              {isTeacher && (
-                <Button 
-                  variant="destructive" 
-                  onClick={() => setShowDeleteConfirmation(true)}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
-                  )}
-                  Eliminar Actividad
-                </Button>
-              )}
-            </div>
-          
-          {loading ? (
-            <div className="flex flex-col justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-              <button 
-                onClick={() => setLoading(false)}
-                className="mt-2 text-sm text-primary underline"
+              <Button 
+                variant="outline" 
+                onClick={() => router.back()}
               >
-                Continuar sin esperar
-              </button>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver
+              </Button>
             </div>
-          ) : (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-2xl">{activity.name}</CardTitle>
-                      {activity.endDate && (
-                        <div className="flex items-center mt-2 text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Fecha límite: {format(activity.endDate, "PPP", { locale: es })}
-                          {activity.isExpired && (
-                            <Badge variant="destructive" className="ml-2">Expirado</Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {userHasSubmitted && (
-                        <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                          Entregado
-                        </Badge>
-                      )}
-                      {submittedResponse?.grade !== undefined && submittedResponse?.grade !== null && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          Calificación: {submittedResponse.grade}/10
-                        </Badge>
-                      )}
-                      
-                      {isTeacher && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={handleViewResponses}
-                        >
-                          <Users className="h-4 w-4 mr-2" />
-                          Ver Respuestas
-                        </Button>
-                      )}
-                      
-                      {/* Temporal debug badge - remove in production */}
-                      {isDevelopment && (
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          {isTeacher ? 'Teacher: Yes' : 'Teacher: No'}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium mb-2">Descripción</h3>
-                    <p>{activity.description}</p>
-                  </div>
-                  
-                  {activity.fileId && (
-                    <div>
-                      <h3 className="text-lg font-medium mb-2">Material de la actividad</h3>
-                      <DocumentPreview fileId={activity.fileId} />
-                    </div>
-                  )}
-                  
-                  {/* Student response form section - redesigned with shadcn components */}
-                  <div className="mt-8">
-                    <Card className="border-primary/10">
-                      <CardHeader className="pb-3 border-b">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-xl">Enviar Respuesta</CardTitle>
-                          {userHasSubmitted && (
-                            <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
-                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                              Entregado
-                            </Badge>
-                          )}
-                          {activity?.isExpired && (
-                            <Badge variant="destructive" className="ml-2">
-                              <Clock className="h-3.5 w-3.5 mr-1" />
-                              Plazo vencido
-                            </Badge>
-                          )}
-                        </div>
-                      </CardHeader>
-                      <CardContent className="pt-5">
-                        {submissionError && (
-                          <div className="mb-6 p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md flex items-center">
-                            <XCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-                            <p>{submissionError}</p>
+            
+            {loading ? (
+              <div className="flex flex-col justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+                <button 
+                  onClick={() => setLoading(false)}
+                  className="mt-2 text-sm text-primary underline"
+                >
+                  Continuar sin esperar
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-2xl">{activity.name}</CardTitle>
+                        {activity.endDate && (
+                          <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            Fecha límite: {format(activity.endDate, "PPP", { locale: es })}
+                            {activity.isExpired && (
+                              <Badge variant="destructive" className="ml-2">Expirado</Badge>
+                            )}
                           </div>
                         )}
-                        
-                        {userHasSubmitted ? (
-                          <div className="space-y-6">
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {userHasSubmitted && (
+                          <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Entregado
+                          </Badge>
+                        )}
+                        {submittedResponse?.grade !== undefined && submittedResponse?.grade !== null && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            Calificación: {submittedResponse.grade}/10
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Descripción</h3>
+                      <p>{activity.description}</p>
+                    </div>
+                    
+                    {activity.fileId && (
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Material de la actividad</h3>
+                        <DocumentPreview fileId={activity.fileId} />
+                      </div>
+                    )}
+                    
+                    {/* Student response form section - redesigned with shadcn components */}
+                    <div className="mt-8">
+                      <Card className="border-primary/10">
+                        <CardHeader className="pb-3 border-b">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-xl">Enviar Respuesta</CardTitle>
+                            {userHasSubmitted && (
+                              <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 border-green-200">
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                Entregado
+                              </Badge>
+                            )}
+                            {activity?.isExpired && (
+                              <Badge variant="destructive" className="ml-2">
+                                <Clock className="h-3.5 w-3.5 mr-1" />
+                                Plazo vencido
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-5">
+                          {submissionError && (
+                            <div className="mb-6 p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md flex items-center">
+                              <XCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                              <p>{submissionError}</p>
+                            </div>
+                          )}
+                          
+                          {userHasSubmitted ? (
+                            <div className="space-y-6">
+                              <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
+                                <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
+                                <p>Ya has enviado tu respuesta para esta actividad. No es posible realizar múltiples envíos.</p>
+                              </div>
+                              
+                              {/* Display grade information if available */}
+                              {renderGradeInfo()}
+                            </div>
+                          ) : isSubmitted ? (
                             <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
                               <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
-                              <p>Ya has enviado tu respuesta para esta actividad. No es posible realizar múltiples envíos.</p>
+                              <p>Ya has enviado tu respuesta para esta actividad.</p>
                             </div>
-                            
-                            {/* Display grade information if available */}
-                            {renderGradeInfo()}
-                          </div>
-                        ) : isSubmitted ? (
-                          <div className="p-4 border border-green-200 bg-green-50 text-green-800 rounded-md flex items-center">
-                            <CheckCircle2 className="h-5 w-5 mr-3 text-green-600 flex-shrink-0" />
-                            <p>Ya has enviado tu respuesta para esta actividad.</p>
-                          </div>
-                        ) : (
-                          <form onSubmit={handleSubmitWithFile} className="space-y-6">
-                            {!getCurrentUserId() && (
-                              <div className="space-y-2">
-                                <Label htmlFor="studentId">ID de Estudiante</Label>
-                                <Input
-                                  id="studentId"
-                                  placeholder="Ingresa tu ID de estudiante"
-                                  required
-                                />
-                              </div>
-                            )}
-                            
-                            {!getCurrentUsername() && (
-                              <div className="space-y-2">
-                                <Label htmlFor="studentName">Nombre de Estudiante</Label>
-                                <Input
-                                  id="studentName"
-                                  placeholder="Ingresa tu nombre completo"
-                                  required
-                                />
-                              </div>
-                            )}
-                            
-                            {/* File input with improved styling */}
-                            <div className="space-y-2">
-                              <Label htmlFor="file" className="block font-medium">
-                                Archivo de Respuesta <span className="text-destructive">*</span>
-                              </Label>
-                              <div className="border rounded-md p-4 bg-muted/30">
-                                <div className="flex flex-col items-center justify-center gap-2">
-                                  <div className="p-2 rounded-full bg-primary/10">
-                                    <Paperclip className="h-5 w-5 text-primary" />
-                                  </div>
-                                  <p className="text-sm text-muted-foreground text-center">
-                                    Arrastra y suelta tu archivo aquí o
-                                  </p>
+                          ) : (
+                            <form onSubmit={handleSubmitWithFile} className="space-y-6">
+                              {!getCurrentUserId() && (
+                                <div className="space-y-2">
+                                  <Label htmlFor="studentId">ID de Estudiante</Label>
                                   <Input
-                                    type="file"
-                                    id="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    className="max-w-xs"
+                                    id="studentId"
+                                    placeholder="Ingresa tu ID de estudiante"
                                     required
                                   />
                                 </div>
-                                
-                                {selectedFile && (
-                                  <div className="mt-4 p-3 border border-primary/20 bg-primary/5 rounded-md">
-                                    <div className="flex items-center">
-                                      <FileText className="h-4 w-4 mr-2 text-primary" />
-                                      <span className="text-sm font-medium">{selectedFile.name}</span>
-                                      <Badge variant="outline" className="ml-2">
-                                        {Math.round(selectedFile.size / 1024)} KB
-                                      </Badge>
+                              )}
+                              
+                              {!getCurrentUsername() && (
+                                <div className="space-y-2">
+                                  <Label htmlFor="studentName">Nombre de Estudiante</Label>
+                                  <Input
+                                    id="studentName"
+                                    placeholder="Ingresa tu nombre completo"
+                                    required
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* File input with improved styling */}
+                              <div className="space-y-2">
+                                <Label htmlFor="file" className="block font-medium">
+                                  Archivo de Respuesta <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="border rounded-md p-4 bg-muted/30">
+                                  <div className="flex flex-col items-center justify-center gap-2">
+                                    <div className="p-2 rounded-full bg-primary/10">
+                                      <Paperclip className="h-5 w-5 text-primary" />
                                     </div>
+                                    <p className="text-sm text-muted-foreground text-center">
+                                      Arrastra y suelta tu archivo aquí o
+                                    </p>
+                                    <Input
+                                      type="file"
+                                      id="file"
+                                      ref={fileInputRef}
+                                      onChange={handleFileChange}
+                                      className="max-w-xs"
+                                      required
+                                    />
                                   </div>
+                                  
+                                  {selectedFile && (
+                                    <div className="mt-4 p-3 border border-primary/20 bg-primary/5 rounded-md">
+                                      <div className="flex items-center">
+                                        <FileText className="h-4 w-4 mr-2 text-primary" />
+                                        <span className="text-sm font-medium">{selectedFile.name}</span>
+                                        <Badge variant="outline" className="ml-2">
+                                          {Math.round(selectedFile.size / 1024)} KB
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* Note input with improved styling */}
+                              <div className="space-y-2">
+                                <Label htmlFor="note" className="font-medium">
+                                  Nota (opcional)
+                                </Label>
+                                <Textarea
+                                  id="note"
+                                  value={note}
+                                  onChange={(e) => setNote(e.target.value)}
+                                  placeholder="Agrega notas o comentarios sobre tu entrega..."
+                                  className="min-h-[120px] resize-none"
+                                />
+                              </div>
+                              
+                              {/* Submit button - disabled if user has already submitted */}
+                              <div className="pt-2">
+                                <Button
+                                  type="submit"
+                                  className="w-full"
+                                  disabled={isSubmitting || activity?.isExpired || userHasSubmitted}
+                                  variant={userHasSubmitted || activity?.isExpired ? "outline" : "default"}
+                                >
+                                  {isSubmitting ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Enviando...
+                                    </>
+                                  ) : userHasSubmitted ? (
+                                    <>
+                                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                                      Ya enviado
+                                    </>
+                                  ) : activity?.isExpired ? (
+                                    <>
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      Plazo vencido
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="h-4 w-4 mr-2" />
+                                      Enviar Respuesta
+                                    </>
+                                  )}
+                                </Button>
+                                
+                                {activity?.isExpired && (
+                                  <p className="mt-2 text-sm text-destructive flex items-center justify-center">
+                                    <Clock className="h-4 w-4 mr-1" />
+                                    El plazo de entrega ha vencido
+                                  </p>
                                 )}
                               </div>
-                            </div>
-                            
-                            {/* Note input with improved styling */}
-                            <div className="space-y-2">
-                              <Label htmlFor="note" className="font-medium">
-                                Nota (opcional)
-                              </Label>
-                              <Textarea
-                                id="note"
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                placeholder="Agrega notas o comentarios sobre tu entrega..."
-                                className="min-h-[120px] resize-none"
-                              />
-                            </div>
-                            
-                            {/* Submit button - disabled if user has already submitted */}
-                            <div className="pt-2">
-                              <Button
-                                type="submit"
-                                className="w-full"
-                                disabled={isSubmitting || activity?.isExpired || userHasSubmitted}
-                                variant={userHasSubmitted || activity?.isExpired ? "outline" : "default"}
-                              >
-                                {isSubmitting ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Enviando...
-                                  </>
-                                ) : userHasSubmitted ? (
-                                  <>
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Ya enviado
-                                  </>
-                                ) : activity?.isExpired ? (
-                                  <>
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    Plazo vencido
-                                  </>
-                                ) : (
-                                  <>
-                                    <Upload className="h-4 w-4 mr-2" />
-                                    Enviar Respuesta
-                                  </>
-                                )}
-                              </Button>
-                              
-                              {activity?.isExpired && (
-                                <p className="mt-2 text-sm text-destructive flex items-center justify-center">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  El plazo de entrega ha vencido
-                                </p>
-                              )}
-                            </div>
-                          </form>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-        
-        {/* Debug tools in development mode */}
-        {false && (
-          <div className="mt-8 border-t pt-4 text-xs text-gray-500">
-            <p>Debug Tools (Development Only)</p>
-            <div className="flex gap-2 mt-2">
-              <a 
-                href="/debug" 
-                target="_blank" 
-                className="text-blue-500 hover:underline"
-              >
-                View Debug Logs
-              </a>
-              <span>|</span>
-              <a 
-                href={`/api/debug-proxy?activityId=${activityId}&userId=${getCurrentUserId() || ''}`} 
-                target="_blank" 
-                className="text-blue-500 hover:underline"
-              >
-                Test API Response
-              </a>
-              <span>|</span>
-              <a 
-                href={`/api/debug/test-proxy?activityId=${activityId}&userId=${getCurrentUserId() || ''}`} 
-                target="_blank" 
-                className="text-blue-500 hover:underline"
-              >
-                Test Proxy
-              </a>
-              <span>|</span>
-              <a 
-                href={`/api/proxy/activitiesresponses/fallback/activity/${activityId}/user/${getCurrentUserId() || ''}`} 
-                target="_blank" 
-                className="text-blue-500 hover:underline"
-              >
-                Fallback API
-              </a>
-              <span>|</span>
-              <button 
-                onClick={() => {
-                  setIsLoading(false);
-                  serverLog('Manual reset of loading state', { isLoading: false });
-                }}
-                className="text-red-500 hover:underline"
-              >
-                Reset Loading State
-              </button>
-            </div>
+                            </form>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
-        )}
         </StableContainer>
       ) : (
         <div className="py-12 text-center">
@@ -1882,262 +1453,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           </p>
         </div>
       )}
-
-      {/* Dialog for viewing all student responses */}
-      <Dialog open={viewResponses} onOpenChange={setViewResponses}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Respuestas de Estudiantes</DialogTitle>
-            <DialogDescription>
-              Todas las respuestas para la actividad: {activity?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {loadingResponses ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-            </div>
-          ) : responses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {responses.map((response) => (
-                <ResponseCard
-                  key={response.id}
-                  response={response}
-                  onViewDetails={handleViewResponseDetail}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog for viewing response details */}
-      <Dialog 
-        open={isGrading} 
-        onOpenChange={(open) => {
-          console.log('Dialog onOpenChange called with:', open);
-          // Si estamos cerrando el diálogo, limpiamos estados
-          if (!open) {
-            console.log('Cerrando diálogo y limpiando estados');
-            // Primero cerrar el diálogo
-            setIsGrading(false);
-            
-            // Luego limpiar estados con un pequeño retraso
-            setTimeout(() => {
-              setSelectedResponse(null);
-              setGradeInput("");
-            }, 300); // Pequeño retraso para asegurar que la animación de cierre termine
-          } else {
-            // Si estamos abriendo, establecer isGrading
-            setIsGrading(true);
-          }
-        }}
-      >
-        <DialogContent 
-          className="max-w-5xl max-h-[90vh] overflow-y-auto"
-          onKeyDown={(e) => {
-            // Detener propagación de todos los eventos de teclado
-            e.stopPropagation();
-            // Prevenir comportamiento por defecto para teclas que podrían causar recarga
-            if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
-              e.preventDefault();
-              console.log('Prevented reload key in dialog');
-            }
-          }}
-          onClick={(e) => {
-            // Detener propagación de clics para evitar interacciones no deseadas
-            e.stopPropagation();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Detalle de Respuesta</DialogTitle>
-            <DialogDescription>
-              Respuesta de {selectedResponse?.studentName || ''}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedResponse && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Información del Estudiante</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{selectedResponse.studentName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {formatDateTime(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          Entregado hace {timeSince(new Date(selectedResponse.submissionDate || selectedResponse.createdAt || selectedResponse.created || Date.now()))}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Calificación</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {selectedResponse?.grade !== undefined && selectedResponse.grade !== null && (
-                        <div className="flex items-center justify-center">
-                          <div className="text-3xl font-bold">
-                            {selectedResponse.grade}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <GradeInput
-                        value={gradeInput}
-                        onChange={handleGradeInputChange}
-                        onSave={saveGrade}
-                        disabled={false} /* Nunca deshabilitar para evitar problemas de estado */
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {/* Archivo entregado - Previsualización */}
-              {(selectedResponse.fileId || selectedResponse.responseFileId || selectedResponse.fileURL) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center">
-                      <FileText className="h-5 w-5 mr-2 text-primary" />
-                      Archivo Entregado
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Botones de acción arriba para facilitar acceso */}
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center mb-2">
-                      <Button
-                        variant="default"
-                        className="w-full sm:w-auto"
-                        onClick={() => {
-                          const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
-                          if (fileId) {
-                            window.open(getFileUrl(fileId), '_blank');
-                          }
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver en nueva pestaña
-                      </Button>
-                      
-                      <Button 
-                        variant="outline"
-                        className="w-full sm:w-auto"
-                        onClick={() => {
-                          const fileId = selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL;
-                          if (fileId) {
-                            downloadFile(fileId);
-                          }
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Descargar archivo
-                      </Button>
-                    </div>
-                    
-                    {/* Mostrar la previsualización */}
-                    <div className="border rounded-md overflow-hidden h-[400px]">
-                      {selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL ? (
-                        <DocumentPreview 
-                          fileId={selectedResponse.responseFileId || selectedResponse.fileId || selectedResponse.fileURL}
-                          hideButtons={true}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <p className="text-muted-foreground">No hay archivo disponible para previsualizar</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {(selectedResponse.finalNote || selectedResponse.note) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Nota del Estudiante</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="p-3 bg-muted rounded-md">
-                      <p className="whitespace-pre-wrap">{selectedResponse.finalNote || selectedResponse.note}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={(e) => {
-                e.stopPropagation(); // Prevenir propagación del evento
-                console.log('Close button clicked');
-                setIsGrading(false);
-              }}
-            >
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la actividad
-              "{activity?.name}" y todas las respuestas asociadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                // Prevent default to handle deletion manually
-                e.preventDefault();
-                handleDeleteActivity();
-              }}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Eliminando...
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Eliminar
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
