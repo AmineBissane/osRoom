@@ -25,6 +25,7 @@ import { fetchWithAuth, getCurrentUsername } from '@/utils/fetchWithAuth'
 import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 interface Activity {
   id: number | string;
@@ -55,6 +56,25 @@ interface ActivityResponse {
   gradedBy?: string;
   gradedAt?: string;
 }
+
+// Format date and time for display
+const formatDateTime = (dateString: string | undefined): string => {
+  if (!dateString) return 'No disponible';
+  
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
+};
 
 // Function to decode JWT token
 const decodeJwt = (token: string) => {
@@ -167,6 +187,38 @@ if (typeof window !== 'undefined') {
   });
 }
 
+interface ResponseCardProps {
+  response: ActivityResponse;
+  onViewDetails: (response: ActivityResponse) => void;
+}
+
+// Response card component to display in the list
+const ResponseCard: React.FC<ResponseCardProps> = ({ response, onViewDetails }) => (
+  <div className="p-4 border border-primary/10 rounded-md">
+    <div className="flex justify-between items-center">
+      <div>
+        <p className="text-sm font-medium leading-none">{response.studentName}</p>
+        <p className="text-sm text-muted-foreground">{formatDateTime(response.submissionDate)}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        {response.grade !== undefined && response.grade !== null && (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            {response.grade}/10
+          </Badge>
+        )}
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => onViewDetails(response)}
+        >
+          <Eye className="h-4 w-4 mr-2" />
+          Ver Detalles
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
 export default function ActivityPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -188,6 +240,9 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   const [initializing, setInitializing] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const [viewResponses, setViewResponses] = useState(false);
+  const [responses, setResponses] = useState<ActivityResponse[]>([]);
+  const [loadingResponses, setLoadingResponses] = useState(true);
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -894,13 +949,48 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   };
 
   // Function to fetch all responses for an activity (for teachers)
-  const fetchAllResponses = () => {};
+  const fetchAllResponses = async () => {
+    try {
+      console.log('Fetching all responses for activity:', activityId);
+      serverLog('Starting fetchAllResponses', { activityId });
+      
+      const response = await fetch(`/api/proxy/activitiesresponses/activity/${activityId}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Error fetching responses:', response.statusText);
+        setError('Error al cargar las respuestas');
+        setLoadingResponses(false);
+        return;
+      }
+      
+      const responses = await response.json();
+      console.log('Responses received:', responses);
+      
+      setResponses(responses);
+      setLoadingResponses(false);
+      serverLog('Completed fetchAllResponses', { responses });
+    } catch (error) {
+      console.error('Error fetching responses:', error);
+      setError('Error al cargar las respuestas');
+      setLoadingResponses(false);
+    }
+  };
 
   // Function to handle viewing all responses (for teachers)
-  const handleViewResponses = () => {};
+  const handleViewResponses = () => {
+    fetchAllResponses();
+    setViewResponses(true);
+  };
 
   // Function to view a specific response detail
-  const handleViewResponseDetail = () => {};
+  const handleViewResponseDetail = (response: ActivityResponse) => {
+    // Implement the logic to view a specific response detail
+    console.log('Viewing response detail:', response);
+  };
 
   // Function to handle grade input change
   const handleGradeInputChange = () => {};
@@ -911,26 +1001,8 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
   // Function to get a file URL for download or preview
   const getFileUrl = (fileId: string | undefined): string => {
     if (!fileId) return '';
+    // Use relative path to ensure secure connection
     return `/api/proxy/file-storage/download/${fileId}`;
-  };
-
-  // Format date and time for display
-  const formatDateTime = (dateString: string | undefined): string => {
-    if (!dateString) return 'No disponible';
-    
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString('es-ES', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return dateString;
-    }
   };
 
   // DocumentPreview component to preview files
@@ -947,7 +1019,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             throw new Error('No file ID provided');
           }
           
-          // Create direct preview URL
+          // Create secure preview URL using relative path
           const url = `/api/proxy/file-storage/download/${fileId}`;
           setPreviewUrl(url);
           
@@ -1018,24 +1090,16 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           </div>
         )}
         <div className="border rounded-md overflow-hidden">
-          <object 
-            data={previewUrl} 
-            type="application/pdf"
-            className="w-full h-[400px]"
-          >
-            <iframe 
-              src={previewUrl}
-              className="w-full h-[400px]" 
-              title="Vista previa"
-            />
-          </object>
+          <iframe 
+            src={previewUrl}
+            className="w-full h-[400px]" 
+            title="Vista previa"
+            sandbox="allow-same-origin allow-scripts"
+          />
         </div>
       </div>
     );
   };
-
-  // Response card component to display in the list
-  const ResponseCard = () => null;
 
   // Add safety timeout for loading state
   useEffect(() => {
@@ -1219,6 +1283,14 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={handleViewResponses}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Ver Respuestas
               </Button>
             </div>
             
@@ -1453,6 +1525,38 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
           </p>
         </div>
       )}
+
+      {/* Dialog for viewing all student responses */}
+      <Dialog open={viewResponses} onOpenChange={setViewResponses}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Respuestas de Estudiantes</DialogTitle>
+            <DialogDescription>
+              Todas las respuestas para la actividad: {activity?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {loadingResponses ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+            </div>
+          ) : responses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {responses.map((response) => (
+                <ResponseCard
+                  key={response.id}
+                  response={response}
+                  onViewDetails={handleViewResponseDetail}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">No hay respuestas para esta actividad.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
