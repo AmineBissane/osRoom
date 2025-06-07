@@ -33,10 +33,7 @@ export async function GET(
       headers: {
         'Authorization': cleanToken,
         'Accept': '*/*',
-        'User-Agent': request.headers.get('user-agent') || 'Next.js Proxy',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive'
-      }
+      },
     });
     
     console.log(`Response status: ${response.status}`);
@@ -58,42 +55,17 @@ export async function GET(
       ? 'inline'
       : (contentDisposition || `attachment; filename="file-${id}"`);
     
-    // Create response headers
-    const headers = new Headers({
-      'Content-Type': contentType,
-      'Content-Disposition': disposition,
-      'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache',
-      'Accept-Ranges': 'bytes'
-    });
-
-    // Copy any additional headers from the API response
-    for (const [key, value] of response.headers.entries()) {
-      if (!headers.has(key) && !['connection', 'transfer-encoding'].includes(key.toLowerCase())) {
-        headers.set(key, value);
-      }
-    }
-
-    // Special handling for text files
-    const isTextFile = 
-      contentType.startsWith('text/') || 
-      contentType === 'application/json' ||
-      contentType === 'application/javascript' ||
-      contentType === 'application/xml' ||
-      contentType === 'application/x-yaml';
-
-    if (isPreview && isTextFile) {
-      // For text files, we read the entire content and return it directly
-      const text = await response.text();
-      return new NextResponse(text, {
-        status: 200,
-        headers: headers
-      });
-    }
-
-    // For other files, stream the response
-    return new NextResponse(response.body, {
+    // Get the response data
+    const data = await response.arrayBuffer();
+    
+    // Return the response with appropriate headers
+    return new NextResponse(data, {
       status: 200,
-      headers: headers,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': disposition,
+        'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache',
+      }
     });
   } catch (error) {
     console.error('Proxy error:', error);

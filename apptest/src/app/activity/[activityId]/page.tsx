@@ -989,13 +989,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     const [error, setError] = useState<string | null>(null);
     const [fileType, setFileType] = useState<string | null>(null);
     const [textContent, setTextContent] = useState<string | null>(null);
-    
-    // Get the access token from cookies
-    const getToken = () => {
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('access_token='));
-      return tokenCookie ? tokenCookie.split('=')[1] : null;
-    };
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
     
     useEffect(() => {
       const loadPreview = async () => {
@@ -1005,26 +999,14 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // Get the token
-          const token = getToken();
-          if (!token) {
-            throw new Error('No authentication token found');
-          }
+          // Use our proxy to avoid CORS issues
+          const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
           
-          // Create direct API URL
-          const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
-          
-          // Make the API call with the token
-          const response = await fetch(apiUrl, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': '*/*',
-            },
-            credentials: 'include',
-          });
+          // Make the request through our proxy
+          const response = await fetch(proxyUrl);
           
           if (!response.ok) {
-            throw new Error(`API returned status: ${response.status}`);
+            throw new Error(`Proxy returned status: ${response.status}`);
           }
           
           // Get the content type
@@ -1040,16 +1022,11 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             // For text files, get the text content
             const text = await response.text();
             setTextContent(text);
-          } else if (contentType.startsWith('image/')) {
-            // For images, create a blob URL
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            setTextContent(url);
           } else {
-            // For other files, create a blob URL
+            // For binary files, create a blob URL
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
-            setTextContent(url);
+            setBlobUrl(url);
           }
           
           setLoading(false);
@@ -1066,6 +1043,13 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         setError('No se proporcionó un ID de archivo');
         setLoading(false);
       }
+      
+      // Clean up blob URLs on unmount
+      return () => {
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+        }
+      };
     }, [fileId]);
     
     const renderContent = () => {
@@ -1077,16 +1061,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         return <div className="text-red-500 p-4">{error}</div>;
       }
       
-      if (!textContent) {
-        return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
-      }
-      
       // For text content, render it directly
-      if (fileType?.startsWith('text/') || 
-          fileType === 'application/json' ||
-          fileType === 'application/javascript' ||
-          fileType === 'application/xml' ||
-          fileType === 'application/x-yaml') {
+      if (textContent) {
         return (
           <div className="p-4 overflow-auto max-h-[600px] whitespace-pre-wrap font-mono text-sm bg-gray-50 border rounded">
             {textContent}
@@ -1094,19 +1070,22 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         );
       }
       
-      // For images
-      if (fileType?.startsWith('image/')) {
-        return <img src={textContent} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+      // For binary files (images, PDFs, etc.)
+      if (blobUrl) {
+        if (fileType?.startsWith('image/')) {
+          return <img src={blobUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+        } else {
+          return (
+            <iframe 
+              src={blobUrl} 
+              className="w-full h-[600px] border-0" 
+              title="File preview"
+            />
+          );
+        }
       }
       
-      // For PDF and other files
-      return (
-        <iframe 
-          src={textContent} 
-          className="w-full h-[600px] border-0" 
-          title="File preview"
-        />
-      );
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     };
     
     return (
