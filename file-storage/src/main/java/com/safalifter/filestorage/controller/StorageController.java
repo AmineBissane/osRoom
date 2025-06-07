@@ -51,11 +51,13 @@ public class StorageController {
             var fileData = storageService.downloadFile(id);
             String contentType = determineContentType(fileData.getFileName(), fileData.getContentType());
             
+            // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
-            headers.add("Access-Control-Allow-Headers", "*");
-            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type");
+            headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+            headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length");
+            headers.add("Access-Control-Max-Age", "3600");
             
             if (preview) {
                 // For preview, use inline disposition
@@ -75,7 +77,25 @@ public class StorageController {
                     .body(textContent);
             }
             
-            // For binary files, stream the content
+            // For PDF files, ensure proper content type
+            if (contentType.equals("application/pdf")) {
+                headers.add(HttpHeaders.CONTENT_TYPE, "application/pdf");
+                return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentLength(fileData.getData().length)
+                    .body(fileData.getData());
+            }
+            
+            // For images, ensure proper content type
+            if (contentType.startsWith("image/")) {
+                headers.add(HttpHeaders.CONTENT_TYPE, contentType);
+                return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentLength(fileData.getData().length)
+                    .body(fileData.getData());
+            }
+            
+            // For all other binary files, stream the content
             return ResponseEntity.ok()
                 .headers(headers)
                 .contentType(MediaType.parseMediaType(contentType))
@@ -87,10 +107,17 @@ public class StorageController {
             System.err.println("Error downloading file: " + e.getMessage());
             e.printStackTrace();
             
-            // Return error response
+            // Return error response with CORS headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to download file: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(error);
+            return ResponseEntity.internalServerError()
+                .headers(headers)
+                .body(error);
         }
     }
 

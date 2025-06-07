@@ -1102,58 +1102,118 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [objectUrl, setObjectUrl] = useState<string | null>(null);
+    const [fileType, setFileType] = useState<string | null>(null);
     
-    if (!fileId) {
-      return <div className="text-gray-500 p-4">No hay archivo disponible</div>;
+    useEffect(() => {
+      if (!fileId) {
+        setError('No se proporcionó un ID de archivo');
+        setLoading(false);
+        return;
+      }
+      
+      // Direct URL to the file without any token or authentication
+      const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+      
+      const fetchFile = async () => {
+        try {
+          console.log(`Fetching file from: ${apiUrl}`);
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': '*/*',
+            },
+            mode: 'cors',
+            cache: 'no-cache',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API returned status: ${response.status}`);
+          }
+          
+          // Get content type
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          setFileType(contentType);
+          console.log(`File content type: ${contentType}`);
+          
+          // Create a blob URL for the content
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setObjectUrl(url);
+          setLoading(false);
+          
+        } catch (err) {
+          console.error('Error loading file:', err);
+          setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          setLoading(false);
+        }
+      };
+      
+      fetchFile();
+      
+      // Set a timeout to handle cases where the request hangs
+      const timeout = setTimeout(() => {
+        if (loading) {
+          setError('Tiempo de espera agotado al cargar el archivo');
+          setLoading(false);
+        }
+      }, 15000);
+      
+      // Clean up
+      return () => {
+        clearTimeout(timeout);
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
+    }, [fileId, loading]);
+    
+    // Render loading state
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+        </div>
+      );
     }
     
-    // Direct URL to the file without any token or authentication
-    const directUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
-    
-    // Handle iframe load event
-    const handleIframeLoad = () => {
-      setLoading(false);
-    };
-    
-    // Handle iframe error event
-    const handleIframeError = () => {
-      setError('Error al cargar el archivo');
-      setLoading(false);
-    };
-    
-    return (
-      <div className="w-full">
-        {loading && (
-          <div className="flex justify-center items-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-          </div>
-        )}
-        {error && <div className="text-red-500 p-4">{error}</div>}
-        
-        {/* Direct iframe to API - no CORS, no token, just direct access */}
-        <iframe 
-          src={directUrl}
-          className="w-full h-[600px] border-0" 
-          style={{ display: loading && !error ? 'none' : 'block' }}
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-          title="File preview"
-        />
-        
-        {/* Add a direct link as fallback */}
-        {error && (
+    // Render error state
+    if (error) {
+      return (
+        <div className="flex flex-col space-y-4">
+          <div className="text-red-500 p-4">{error}</div>
           <div className="mt-4 text-center">
             <a 
-              href={directUrl}
+              href={`http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 hover:underline"
             >
-              Abrir archivo directamente
+              Abrir archivo directamente en una nueva pestaña
             </a>
           </div>
-        )}
-      </div>
+        </div>
+      );
+    }
+    
+    // Render file preview
+    if (!objectUrl) {
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+    }
+    
+    // For images
+    if (fileType?.startsWith('image/')) {
+      return <img src={objectUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+    }
+    
+    // For PDFs and other files
+    return (
+      <iframe 
+        src={objectUrl} 
+        className="w-full h-[600px] border-0" 
+        title="File preview"
+        sandbox="allow-same-origin allow-scripts"
+      />
     );
   };
 
