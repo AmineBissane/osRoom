@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
     // Use await to access params (this is just a pattern to satisfy Next.js warning)
-    const { id } = await Promise.resolve(params);
+    const { activityId } = await Promise.resolve(params);
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
@@ -18,13 +18,13 @@ export async function GET(
       );
     }
     
-    console.log(`Proxying request for activity: ${id}`);
+    console.log(`Proxying request for activity: ${activityId}`);
     
     // Ensure token is properly formatted
     const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     
     // Make the request to the gateway
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${id}`;
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/${activityId}`;
     console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {

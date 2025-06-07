@@ -17,10 +17,10 @@ export async function OPTIONS() {
 // GET endpoint to fetch activities by classroom ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { activityId: string } }
 ) {
   try {
-    const { id } = params
+    const { activityId } = params
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value
@@ -40,11 +40,11 @@ export async function GET(
       )
     }
 
-    console.log(`Fetching activities for classroom ID: ${id}`)
+    console.log(`Fetching activities for classroom ID: ${activityId}`)
     console.log('Using token:', accessToken.substring(0, 20) + '...')
 
     // Log the full URL for debugging
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/classrooms/${id}`
+    const apiUrl = `http://82.29.168.17:8222/api/v1/activities/classrooms/${activityId}`
     console.log(`Making request to: ${apiUrl}`)
 
     const response = await fetch(apiUrl, {
