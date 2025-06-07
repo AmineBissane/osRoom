@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -994,49 +994,484 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     return `/api/proxy/file-storage/download/${fileId}`;
   };
 
-  // Get the PDF-specific URL for the PDF viewer
-  const getPdfUrl = (fileId: string | undefined): string => {
-    if (!fileId) return '';
-    // Use our specialized PDF endpoint
-    return `/api/proxy/file-storage/pdf/${fileId}?preview=true`;
-  };
-  
-  // Check if a file is a PDF (will check via API)
-  const checkIsPdf = async (fileId: string | undefined): Promise<boolean> => {
-    if (!fileId) return false;
+  // DocumentPreview component optimizado con memo para evitar re-renderizados
+  const DocumentPreview = React.memo(({ 
+    fileId,
+    hideButtons = false 
+  }: { 
+    fileId: string | undefined;
+    hideButtons?: boolean;
+  }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const [displayMode, setDisplayMode] = useState<'iframe' | 'buttons'>('iframe');
+    const [fileName, setFileName] = useState<string>("");
+    const [isNonViewableFile, setIsNonViewableFile] = useState(false);
+    const [fileType, setFileType] = useState<string>("archivo");
+    const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
     
-    try {
-      const response = await fetch(`/api/proxy/file-storage/${fileId}/metadata`);
-      if (!response.ok) return false;
+    // Lista de extensiones de archivo que no se pueden visualizar
+    const nonViewableExtensions = useMemo(() => [
+      '.zip', '.rar', '.7z', '.tar', '.gz', '.exe', '.msi', 
+      '.jar', '.war', '.ear', '.bin', '.iso', '.dmg', '.pkg',
+      '.apk', '.app', '.bat', '.cmd', '.sh'
+    ], []);
+    
+    // Preparar URL del documento
+    const fileUrl = useMemo(() => {
+      if (!fileId) return '';
+      return getFileUrl(fileId, true);
+    }, [fileId]);
+    
+    // Función para comprobar si un archivo es no visualizable por su extensión
+    const isNonViewableExtension = useCallback((filename: string) => {
+      const lowerFilename = filename.toLowerCase();
+      return nonViewableExtensions.some(ext => lowerFilename.endsWith(ext));
+    }, [nonViewableExtensions]);
+    
+    // Función para obtener el tipo de archivo a partir de su nombre
+    const getFileTypeFromName = useCallback((filename: string) => {
+      const lowerFilename = filename.toLowerCase();
       
-      const metadata = await response.json();
-      return metadata.contentType?.includes('pdf') || 
-             metadata.fileName?.toLowerCase().endsWith('.pdf');
-    } catch (error) {
-      console.error('Error checking file type:', error);
-      return false;
-    }
-  };
-
-  // DocumentPreview component to preview files
-  const DocumentPreview = ({ fileId, hideButtons = false }: { fileId: string | undefined, hideButtons?: boolean }) => {
+      if (lowerFilename.endsWith('.zip')) return "ZIP";
+      if (lowerFilename.endsWith('.rar')) return "RAR";
+      if (lowerFilename.endsWith('.7z')) return "7-Zip";
+      if (lowerFilename.endsWith('.tar') || lowerFilename.endsWith('.gz')) return "TAR";
+      if (lowerFilename.endsWith('.exe') || lowerFilename.endsWith('.msi')) return "ejecutable";
+      if (lowerFilename.endsWith('.jar') || lowerFilename.endsWith('.war')) return "Java";
+      
+      // Extraer la extensión del archivo
+      const extension = lowerFilename.split('.').pop();
+      return extension ? extension.toUpperCase() : "archivo";
+    }, []);
+    
+    // Manejar apertura en nueva pestaña
+    const handleOpenInNewTab = useCallback(() => {
+      if (!fileId) return;
+      console.log('Abriendo documento en nueva pestaña:', fileUrl);
+      window.open(fileUrl, '_blank');
+    }, [fileId, fileUrl]);
+    
+    // Manejar descarga
+    const handleDownload = useCallback(() => {
+      if (!fileId) return;
+      console.log('Descargando documento:', fileId);
+      downloadFile(fileId);
+    }, [fileId]);
+    
+    // Manejar reintentos
+    const handleRetry = useCallback(() => {
+      console.log('Reintentando cargar el documento...');
+      setError(null);
+      setIsLoading(true);
+      setDisplayMode('iframe');
+      setRetryCount(prev => prev + 1);
+    }, []);
+    
+    // Mostrar solo botones
+    const handleShowButtonsOnly = useCallback(() => {
+      setDisplayMode('buttons');
+      setIsLoading(false);
+      setError(null);
+    }, []);
+    
+    // Check if the file is viewable or not
+    useEffect(() => {
+      if (!fileId) return;
+      
+      const setAsNonViewable = (name: string) => {
+        console.log(`Archivo no visualizable detectado: ${name}`);
+        setFileName(name);
+        setFileType(getFileTypeFromName(name));
+        setIsNonViewableFile(true);
+        setIsLoading(false);
+        setDisplayMode('buttons');
+        setShouldAutoDownload(true);
+      };
+      
+      // Primero, verificar si el fileId ya contiene información sobre el tipo de archivo
+      if (typeof fileId === 'string') {
+        const lowerFileId = fileId.toLowerCase();
+        
+        // Intentar extraer el nombre del archivo del fileId
+        const possibleFileName = fileId.split('/').pop() || fileId;
+        
+        // Si el fileId contiene una extensión no visualizable
+        if (isNonViewableExtension(possibleFileName)) {
+          setAsNonViewable(possibleFileName);
+          return;
+        }
+      }
+      
+      // Si no se detecta por fileId, intentar obtener metadatos
+      const fetchFileInfo = async () => {
+        try {
+          // Get the token
+          const token = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('access_token='))
+            ?.split('=')[1];
+            
+          if (!token) {
+            console.error('No se encontró token de autenticación');
+            return;
+          }
+          
+          console.log(`Intentando obtener metadatos para el archivo: ${fileId}`);
+          
+          // First, try to get metadata directly
+          try {
+            const metadataResponse = await fetch(`http://localhost:8222/api/v1/file-storage/${fileId}/metadata`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (metadataResponse.ok) {
+              const metadata = await metadataResponse.json();
+              console.log('Metadatos obtenidos:', metadata);
+              
+              if (metadata && metadata.name) {
+                setFileName(metadata.name);
+                
+                if (isNonViewableExtension(metadata.name)) {
+                  setAsNonViewable(metadata.name);
+                  return;
+                }
+              }
+            } else {
+              console.warn(`No se pudieron obtener metadatos. Estado: ${metadataResponse.status}`);
+            }
+          } catch (metadataError) {
+            console.error('Error al obtener metadatos:', metadataError);
+          }
+          
+          // Si no hay metadatos, intentar hacer HEAD al archivo para verificar el tipo MIME
+          try {
+            const headResponse = await fetch(getFileUrl(fileId, true), {
+              method: 'HEAD',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (headResponse.ok) {
+              const contentType = headResponse.headers.get('content-type');
+              const contentDisposition = headResponse.headers.get('content-disposition');
+              
+              console.log('Content-Type:', contentType);
+              console.log('Content-Disposition:', contentDisposition);
+              
+              // Obtener nombre de archivo de Content-Disposition si está disponible
+              if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (filenameMatch && filenameMatch[1]) {
+                  const extractedName = filenameMatch[1];
+                  setFileName(extractedName);
+                  
+                  if (isNonViewableExtension(extractedName)) {
+                    setAsNonViewable(extractedName);
+                    return;
+                  }
+                }
+              }
+              
+              // Verificar el tipo MIME
+              if (contentType) {
+                const nonViewableMimeTypes = [
+                  'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
+                  'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
+                  'application/java-archive'
+                ];
+                
+                if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
+                  console.log(`Archivo no visualizable detectado por MIME type: ${contentType}`);
+                  // Usar el nombre de archivo del fileId si no tenemos uno mejor
+                  if (!fileName) {
+                    const inferredName = fileId.split('/').pop() || 'archivo';
+                    setFileName(inferredName);
+                    setFileType(contentType.split('/').pop() || 'archivo');
+                  }
+                  setIsNonViewableFile(true);
+                  setIsLoading(false);
+                  setDisplayMode('buttons');
+                  setShouldAutoDownload(true);
+                  return;
+                }
+              }
+            }
+          } catch (headError) {
+            console.error('Error al verificar cabeceras del archivo:', headError);
+          }
+          
+        } catch (error) {
+          console.error('Error general al verificar el archivo:', error);
+        }
+      };
+      
+      fetchFileInfo();
+    }, [fileId, fileName, isNonViewableExtension, getFileTypeFromName]);
+    
+    // Efecto para descargar automáticamente cuando se detecta un archivo no visualizable
+    useEffect(() => {
+      if (shouldAutoDownload && fileId) {
+        console.log('Iniciando descarga automática del archivo no visualizable');
+        setTimeout(() => {
+          handleDownload();
+          // Resetear la bandera para evitar descargas múltiples
+          setShouldAutoDownload(false);
+        }, 1000);
+      }
+    }, [shouldAutoDownload, fileId, handleDownload]);
+    
+    // Efecto para controlar cargas y timeouts
+    useEffect(() => {
+      if (!fileId) {
+        setIsLoading(false);
+        setError('No hay archivo disponible');
+        return;
+      }
+      
+      // Skip timeout for non-viewable files
+      if (isNonViewableFile) {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Timeout de seguridad
+      const timeout = setTimeout(() => {
+        if (isLoading && displayMode === 'iframe') {
+          console.log('Timeout de carga de documento alcanzado');
+          setError('El visor de documentos no pudo cargar. Utilice los botones para abrir el documento.');
+          setIsLoading(false);
+        }
+      }, 15000); // 15 segundos para timeout
+      
+      return () => clearTimeout(timeout);
+    }, [fileId, isLoading, displayMode, isNonViewableFile]);
+    
+    // Efecto para descargar automáticamente archivos no visualizables
+    useEffect(() => {
+      if (isNonViewableFile && fileId) {
+        console.log('Iniciando descarga automática del archivo no visualizable');
+        const timer = setTimeout(() => {
+          handleDownload();
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }, [isNonViewableFile, fileId, handleDownload]);
+    
+    // Si no hay fileId, mostrar error
     if (!fileId) {
-      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+      return (
+        <div className="flex flex-col space-y-4">
+          {!hideButtons && (
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Button
+                variant="default"
+                className="w-full sm:w-auto"
+                disabled
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Abrir en nueva pestaña
+              </Button>
+              
+              <Button 
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar archivo
+              </Button>
+            </div>
+          )}
+          
+          <div className="w-full h-[400px] border rounded bg-gray-50 flex items-center justify-center">
+            <div className="text-center p-4">
+              <XCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
+              <p className="text-destructive">No hay archivo disponible</p>
+            </div>
+          </div>
+        </div>
+      );
     }
     
-    // Use the enhanced DirectFileViewer for all file types
-    return <DirectFileViewer fileId={fileId} height="600px" showControls={!hideButtons} />;
-  };
+    // Special view for non-viewable files (ZIP, executable, etc.)
+    if (isNonViewableFile) {
+      return (
+        <div className="flex flex-col space-y-4">
+          <div className="flex justify-center">
+            <Button 
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar archivo {fileType}
+            </Button>
+          </div>
+          
+          <div className="w-full border rounded-md p-6 bg-gray-50 flex flex-col items-center justify-center">
+            <div className="bg-blue-50 rounded-full p-4 mb-4">
+              <FileText className="h-12 w-12 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">{fileName || `Archivo ${fileType}`}</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              Los archivos {fileType} no se pueden previsualizar. Haga clic en el botón de descarga para obtener el archivo.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Modo solo botones (sin iframe)
+    if (displayMode === 'buttons') {
+      return (
+        <div className="flex flex-col space-y-4">
+          {!hideButtons && (
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Button
+                variant="default"
+                className="w-full sm:w-auto"
+                onClick={handleOpenInNewTab}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Abrir en nueva pestaña
+              </Button>
+              
+              <Button 
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar archivo
+              </Button>
+              
+              <Button 
+                variant="secondary"
+                className="w-full sm:w-auto"
+                onClick={handleRetry}
+              >
+                <Loader2 className="h-4 w-4 mr-2" />
+                Cargar vista previa
+              </Button>
+            </div>
+          )}
+          
+          <div className="w-full h-[400px] border rounded bg-gray-100 flex items-center justify-center">
+            <div className="text-center p-6">
+              <FileText className="h-16 w-16 text-primary/40 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Vista previa no disponible</h3>
+              <p className="text-muted-foreground mb-4">
+                Utilice los botones para ver o descargar el documento.
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleRetry}
+                className="mx-auto"
+              >
+                Reintentar vista previa
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Modo normal con iframe
+    return (
+      <div className="flex flex-col space-y-4">
+        {!hideButtons && (
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button
+              variant="default"
+              className="w-full sm:w-auto"
+              onClick={handleOpenInNewTab}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Abrir en nueva pestaña
+            </Button>
+            
+            <Button 
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar archivo
+            </Button>
+            
+            <Button 
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={handleShowButtonsOnly}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Ocultar vista previa
+            </Button>
+          </div>
+        )}
+        
+        <div className="relative w-full h-[400px] border rounded bg-gray-50">
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+              <p className="text-gray-500">Cargando documento...</p>
+            </div>
+          )}
+          
+          {error && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 z-20">
+              <XCircle className="h-12 w-12 text-destructive mb-2" />
+              <p className="text-center mb-4">{error}</p>
+              <div className="flex gap-2">
+                <Button onClick={handleRetry} variant="outline">
+                  Reintentar
+                </Button>
+                <Button onClick={handleShowButtonsOnly} variant="default">
+                  Solo botones
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          <iframe 
+            key={`document-preview-${fileId}-${retryCount}`}
+            src={fileUrl}
+            className={`w-full h-full border-0 ${isLoading || error ? 'hidden' : ''}`}
+            title="Document Preview"
+            onLoad={() => {
+              console.log('Documento cargado correctamente');
+              setIsLoading(false);
+            }}
+            onError={() => {
+              console.error('Error al cargar el documento');
+              setIsLoading(false);
+              setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
+            }}
+            allow="fullscreen"
+          />
+        </div>
+      </div>
+    );
+  });
+
+  DocumentPreview.displayName = 'DocumentPreview';
 
   // Direct document preview component for response details dialog
-  const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
+  const DirectDocumentPreview = React.memo(({ fileId }: { fileId: string | undefined }) => {
     if (!fileId) {
       return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     }
     
-    // Use the enhanced DirectFileViewer for all file types
-    return <DirectFileViewer fileId={fileId} height="600px" />;
-  };
+    return <DocumentPreview fileId={fileId} hideButtons={false} />;
+  });
+
+  DirectDocumentPreview.displayName = 'DirectDocumentPreview';
 
   // Add safety timeout for loading state
   useEffect(() => {

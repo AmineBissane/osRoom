@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, ExternalLink, Link2, RefreshCcw } from 'lucide-react';
+import { Download, ExternalLink, XCircle, FileText, Eye, Loader2 } from 'lucide-react';
 
 interface DirectFileViewerProps {
   fileId: string;
@@ -20,9 +20,41 @@ export default function DirectFileViewer({
   const [fileType, setFileType] = useState<string | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [directLink, setDirectLink] = useState<{url: string, token: string, directAccessUrl?: string} | null>(null);
-  const [approach, setApproach] = useState<'blob' | 'iframe' | 'direct'>('blob');
+  const [approach, setApproach] = useState<'blob' | 'iframe' | 'direct' | 'buttons'>('blob');
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const objectRef = useRef<HTMLObjectElement>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [fileName, setFileName] = useState<string>("");
+  const [isNonViewableFile, setIsNonViewableFile] = useState(false);
+  const [fileTypeName, setFileTypeName] = useState<string>("archivo");
+  
+  // Lista de extensiones de archivo que no se pueden visualizar
+  const nonViewableExtensions = useMemo(() => [
+    '.zip', '.rar', '.7z', '.tar', '.gz', '.exe', '.msi', 
+    '.jar', '.war', '.ear', '.bin', '.iso', '.dmg', '.pkg',
+    '.apk', '.app', '.bat', '.cmd', '.sh'
+  ], []);
+  
+  // Función para comprobar si un archivo es no visualizable por su extensión
+  const isNonViewableExtension = useCallback((filename: string) => {
+    const lowerFilename = filename.toLowerCase();
+    return nonViewableExtensions.some(ext => lowerFilename.endsWith(ext));
+  }, [nonViewableExtensions]);
+  
+  // Función para obtener el tipo de archivo a partir de su nombre
+  const getFileTypeFromName = useCallback((filename: string) => {
+    const lowerFilename = filename.toLowerCase();
+    
+    if (lowerFilename.endsWith('.zip')) return "ZIP";
+    if (lowerFilename.endsWith('.rar')) return "RAR";
+    if (lowerFilename.endsWith('.7z')) return "7-Zip";
+    if (lowerFilename.endsWith('.tar') || lowerFilename.endsWith('.gz')) return "TAR";
+    if (lowerFilename.endsWith('.exe') || lowerFilename.endsWith('.msi')) return "ejecutable";
+    if (lowerFilename.endsWith('.jar') || lowerFilename.endsWith('.war')) return "Java";
+    
+    // Extraer la extensión del archivo
+    const extension = lowerFilename.split('.').pop();
+    return extension ? extension.toUpperCase() : "archivo";
+  }, []);
 
   // Function to fetch the direct link as fallback
   const fetchDirectLink = async () => {
@@ -56,9 +88,25 @@ export default function DirectFileViewer({
 
       // Generate URL with timestamp to prevent caching
       const timestamp = new Date().getTime();
-      const url = `/api/proxy/file-storage/direct-view/${fileId}?preview=true&t=${timestamp}`;
+      const url = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
       
       console.log('Fetching file using blob approach:', url);
+      
+      // Check if the file is non-viewable first
+      if (typeof fileId === 'string') {
+        // Intentar extraer el nombre del archivo del fileId
+        const possibleFileName = fileId.split('/').pop() || fileId;
+        
+        // Si el fileId contiene una extensión no visualizable
+        if (isNonViewableExtension(possibleFileName)) {
+          setFileName(possibleFileName);
+          setFileTypeName(getFileTypeFromName(possibleFileName));
+          setIsNonViewableFile(true);
+          setLoading(false);
+          setApproach('buttons');
+          return false;
+        }
+      }
       
       // Fetch the file data directly
       const response = await fetch(url, {
@@ -73,9 +121,46 @@ export default function DirectFileViewer({
         throw new Error(`Failed to load file: ${response.status}`);
       }
       
-      // Get the content type
+      // Get the content type and file name
       const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentDisposition = response.headers.get('content-disposition');
       setFileType(contentType);
+      
+      // Extract filename from content-disposition if available
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          const extractedName = filenameMatch[1];
+          setFileName(extractedName);
+          
+          if (isNonViewableExtension(extractedName)) {
+            setFileTypeName(getFileTypeFromName(extractedName));
+            setIsNonViewableFile(true);
+            setLoading(false);
+            setApproach('buttons');
+            return false;
+          }
+        }
+      }
+      
+      // Check if it's a non-viewable MIME type
+      const nonViewableMimeTypes = [
+        'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
+        'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
+        'application/java-archive'
+      ];
+      
+      if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
+        if (!fileName) {
+          const inferredName = fileId.split('/').pop() || 'archivo';
+          setFileName(inferredName);
+          setFileTypeName(contentType.split('/').pop() || 'archivo');
+        }
+        setIsNonViewableFile(true);
+        setLoading(false);
+        setApproach('buttons');
+        return false;
+      }
       
       // Create a blob URL for the content
       const blob = await response.blob();
@@ -109,6 +194,11 @@ export default function DirectFileViewer({
         return;
       }
       
+      if (isNonViewableFile) {
+        // No need to try other approaches for non-viewable files
+        return;
+      }
+      
       // Step 2: If blob failed, switch to iframe approach
       setApproach('iframe');
       setLoading(true);
@@ -128,6 +218,7 @@ export default function DirectFileViewer({
               setError('Try opening the file directly');
             } else {
               setError('Failed to load file. Try refreshing.');
+              setApproach('buttons');
             }
             setLoading(false);
           });
@@ -143,15 +234,16 @@ export default function DirectFileViewer({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [fileId]);
+  }, [fileId, loading, isNonViewableFile]);
 
-  // Handle direct reload attempts
+  // Handle reload attempts
   const reloadFile = async () => {
     // Reset state
     setLoading(true);
     setError(null);
+    setRetryCount(prev => prev + 1);
     
-    if (approach === 'blob') {
+    if (approach === 'blob' || approach === 'buttons') {
       // Try iframe approach
       setApproach('iframe');
       const timestamp = new Date().getTime();
@@ -189,6 +281,34 @@ export default function DirectFileViewer({
       }
     }
   };
+  
+  // Special view for non-viewable files (ZIP, executable, etc.)
+  if (isNonViewableFile) {
+    return (
+      <div className="flex flex-col space-y-4">
+        <div className="flex justify-center">
+          <Button 
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={downloadFile}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Descargar archivo {fileTypeName}
+          </Button>
+        </div>
+        
+        <div className="w-full border rounded-md p-6 bg-gray-50 flex flex-col items-center justify-center" style={{ height }}>
+          <div className="bg-blue-50 rounded-full p-4 mb-4">
+            <FileText className="h-12 w-12 text-blue-500" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">{fileName || `Archivo ${fileTypeName}`}</h3>
+          <p className="text-muted-foreground text-center mb-4">
+            Los archivos {fileTypeName} no se pueden previsualizar. Haga clic en el botón de descarga para obtener el archivo.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     if (loading) {
@@ -205,7 +325,7 @@ export default function DirectFileViewer({
           <p className="text-red-500 mb-4">{error}</p>
           <div className="flex flex-wrap gap-2 justify-center">
             <Button onClick={reloadFile} variant="default">
-              <RefreshCcw className="h-4 w-4 mr-2" />
+              <Loader2 className="h-4 w-4 mr-2" />
               Intentar de nuevo
             </Button>
             <Button onClick={openInNewTab} variant="outline">
@@ -218,7 +338,7 @@ export default function DirectFileViewer({
             </Button>
             {directLink && (
               <Button onClick={openDirectLink} variant="destructive">
-                <Link2 className="h-4 w-4 mr-2" />
+                <ExternalLink className="h-4 w-4 mr-2" />
                 Abrir directo
               </Button>
             )}
@@ -241,20 +361,13 @@ export default function DirectFileViewer({
       // For PDFs
       if (fileType === 'application/pdf' || objectUrl?.toLowerCase().endsWith('.pdf')) {
         return (
-          <div className="w-full h-full">
-            <object
-              ref={objectRef}
-              data={objectUrl}
-              type="application/pdf"
-              width="100%"
-              height="100%"
-              className="border-0"
-            >
-              <p>Your browser does not support PDFs. 
-                <a href={objectUrl} target="_blank" rel="noreferrer">Click here to view the PDF</a>
-              </p>
-            </object>
-          </div>
+          <iframe
+            src={objectUrl}
+            width="100%"
+            height="100%"
+            className="border-0"
+            title="PDF Viewer"
+          />
         );
       }
       
@@ -286,69 +399,7 @@ export default function DirectFileViewer({
         );
       }
       
-      // For text files, JSON, CSV, etc.
-      if (fileType?.startsWith('text/') || 
-          fileType === 'application/json' || 
-          fileType === 'application/csv' ||
-          fileType === 'application/xml') {
-        
-        const [textContent, setTextContent] = useState<string | null>(null);
-        
-        useEffect(() => {
-          const fetchTextContent = async () => {
-            try {
-              if (objectUrl) {
-                const response = await fetch(objectUrl);
-                const text = await response.text();
-                setTextContent(text);
-              }
-            } catch (err) {
-              console.error('Error fetching text content:', err);
-            }
-          };
-          
-          fetchTextContent();
-          
-          return () => {
-            // Cleanup
-          };
-        }, [objectUrl]);
-        
-        return (
-          <div className="w-full h-full overflow-auto">
-            {textContent ? (
-              <pre className="p-4 text-sm font-mono whitespace-pre-wrap bg-gray-50 border rounded h-full overflow-auto">
-                {textContent}
-              </pre>
-            ) : (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-              </div>
-            )}
-          </div>
-        );
-      }
-      
-      // For Office documents (Word, Excel, PowerPoint)
-      if (fileType?.includes('officedocument') || 
-          fileType?.includes('msword') || 
-          fileType?.includes('ms-excel') ||
-          fileType?.includes('ms-powerpoint')) {
-        return (
-          <div className="w-full h-full">
-            <iframe
-              ref={iframeRef}
-              src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + '/api/proxy/file-storage/download/' + fileId + '?preview=true')}`}
-              width="100%"
-              height="100%"
-              className="border-0"
-              title="Office Document Viewer"
-            />
-          </div>
-        );
-      }
-      
-      // For other file types
+      // For other file types, use iframe as fallback
       return (
         <iframe
           ref={iframeRef}
@@ -373,8 +424,45 @@ export default function DirectFileViewer({
           title="File Viewer"
           sandbox="allow-same-origin allow-scripts"
           onLoad={() => setLoading(false)}
-          onError={() => setError('Failed to load file in iframe')}
+          onError={() => {
+            setError('Failed to load file in iframe');
+            setApproach('buttons');
+          }}
         />
+      );
+    }
+    
+    // Buttons-only approach
+    if (approach === 'buttons') {
+      return (
+        <div className="flex flex-col items-center justify-center p-4 h-full">
+          <div className="flex flex-col items-center mb-8">
+            <FileText className="h-16 w-16 text-gray-300 mb-4" />
+            <p className="text-gray-500 text-center mb-4">
+              La vista previa no está disponible. Utilice los botones para abrir o descargar el archivo.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <Button onClick={reloadFile} variant="default">
+              <Loader2 className="h-4 w-4 mr-2" />
+              Intentar vista previa
+            </Button>
+            <Button onClick={openInNewTab} variant="outline">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Nueva pestaña
+            </Button>
+            <Button onClick={downloadFile} variant="secondary">
+              <Download className="h-4 w-4 mr-2" />
+              Descargar
+            </Button>
+            {directLink && (
+              <Button onClick={openDirectLink} variant="default">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Enlace directo
+              </Button>
+            )}
+          </div>
+        </div>
       );
     }
     
@@ -386,10 +474,10 @@ export default function DirectFileViewer({
     <div className="relative" style={{ width, height }}>
       {renderContent()}
       
-      {showControls && !loading && !error && (
+      {showControls && !loading && !error && approach !== 'buttons' && (
         <div className="absolute bottom-4 right-4 flex flex-wrap gap-2">
           <Button onClick={reloadFile} variant="ghost" size="sm" className="opacity-80 hover:opacity-100">
-            <RefreshCcw className="h-4 w-4 mr-1" />
+            <Loader2 className="h-4 w-4 mr-1" />
             Recargar
           </Button>
           <Button onClick={openInNewTab} variant="default" size="sm" className="opacity-80 hover:opacity-100">
@@ -402,7 +490,7 @@ export default function DirectFileViewer({
           </Button>
           {directLink && (
             <Button onClick={openDirectLink} variant="secondary" size="sm" className="opacity-80 hover:opacity-100">
-              <Link2 className="h-4 w-4 mr-1" />
+              <ExternalLink className="h-4 w-4 mr-1" />
               Directo
             </Button>
           )}
