@@ -15,6 +15,8 @@ import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -134,5 +136,121 @@ public class StorageService {
     public File findFileById(String id) {
         return fileRepository.findById(id).orElseThrow(() ->
                 new RuntimeException("File not found with id: " + id));
+    }
+
+    /**
+     * Get file metadata without downloading the full file content
+     */
+    public Map<String, Object> getFileMetadata(String id) {
+        // Find file in the database
+        File file = findFileById(id);
+        
+        // Get basic file info
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("id", file.getId());
+        metadata.put("contentType", file.getType());
+        metadata.put("fileName", file.getOriginalFileName());
+        
+        // Check if the file exists on disk and get file size
+        java.io.File physicalFile = new java.io.File(file.getFilePath());
+        if (physicalFile.exists()) {
+            metadata.put("fileSize", physicalFile.length());
+            metadata.put("lastModified", physicalFile.lastModified());
+        }
+        
+        // Determine content type more accurately
+        String contentType = determineContentType(file.getOriginalFileName(), file.getType());
+        metadata.put("detectedContentType", contentType);
+        
+        // Determine if file is previewable
+        boolean isPreviewable = isPreviewableType(contentType);
+        metadata.put("isPreviewable", isPreviewable);
+        
+        // Get file extension
+        String extension = "";
+        int lastDot = file.getOriginalFileName().lastIndexOf('.');
+        if (lastDot > 0) {
+            extension = file.getOriginalFileName().substring(lastDot + 1).toLowerCase();
+            metadata.put("extension", extension);
+        }
+        
+        return metadata;
+    }
+    
+    /**
+     * Determines if a file type can be previewed in the browser
+     */
+    private boolean isPreviewableType(String contentType) {
+        if (contentType == null) return false;
+        
+        return contentType.startsWith("image/") ||
+               contentType.equals("application/pdf") ||
+               contentType.startsWith("text/") ||
+               contentType.equals("application/json") ||
+               contentType.equals("application/javascript") ||
+               contentType.equals("application/xml");
+    }
+    
+    /**
+     * Determines the correct content type based on file name and provided content type
+     */
+    private String determineContentType(String fileName, String providedContentType) {
+        // Default content type
+        String defaultType = "application/octet-stream";
+        
+        // If we have a valid content type that's not octet-stream, use it
+        if (providedContentType != null && !providedContentType.equals(defaultType)) {
+            return providedContentType;
+        }
+        
+        // If we have a filename, try to determine content type from extension
+        if (fileName != null) {
+            String extension = "";
+            int lastDot = fileName.lastIndexOf('.');
+            if (lastDot > 0) {
+                extension = fileName.substring(lastDot + 1).toLowerCase();
+            }
+            
+            if (!extension.isEmpty()) {
+                // Common file types mapping
+                Map<String, String> typeMap = new HashMap<>();
+                typeMap.put("pdf", "application/pdf");
+                typeMap.put("jpg", "image/jpeg");
+                typeMap.put("jpeg", "image/jpeg");
+                typeMap.put("png", "image/png");
+                typeMap.put("gif", "image/gif");
+                typeMap.put("svg", "image/svg+xml");
+                typeMap.put("webp", "image/webp");
+                typeMap.put("txt", "text/plain");
+                typeMap.put("html", "text/html");
+                typeMap.put("css", "text/css");
+                typeMap.put("js", "application/javascript");
+                typeMap.put("json", "application/json");
+                typeMap.put("xml", "application/xml");
+                typeMap.put("csv", "text/csv");
+                typeMap.put("doc", "application/msword");
+                typeMap.put("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+                typeMap.put("xls", "application/vnd.ms-excel");
+                typeMap.put("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                typeMap.put("ppt", "application/vnd.ms-powerpoint");
+                typeMap.put("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+                typeMap.put("mp3", "audio/mpeg");
+                typeMap.put("mp4", "video/mp4");
+                typeMap.put("wav", "audio/wav");
+                typeMap.put("ogg", "audio/ogg");
+                typeMap.put("webm", "video/webm");
+                typeMap.put("zip", "application/zip");
+                typeMap.put("rar", "application/x-rar-compressed");
+                typeMap.put("tar", "application/x-tar");
+                typeMap.put("gz", "application/gzip");
+                
+                String contentType = typeMap.get(extension);
+                if (contentType != null) {
+                    return contentType;
+                }
+            }
+        }
+        
+        return defaultType;
     }
 }

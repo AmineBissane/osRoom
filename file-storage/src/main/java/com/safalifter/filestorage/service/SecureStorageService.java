@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -147,11 +149,11 @@ public class SecureStorageService {
     }
     
     /**
-     * Find file by ID
+     * Find a file by its ID
      */
-    private File findFileById(String id) {
+    public File findFileById(String id) {
         return fileRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("File not found with ID: " + id));
+                .orElseThrow(() -> new RuntimeException("File not found with id: " + id));
     }
     
     /**
@@ -171,6 +173,49 @@ public class SecureStorageService {
         } else {
             return 1; // Standard security for other types
         }
+    }
+    
+    /**
+     * Get file metadata without downloading the full file content
+     */
+    public Map<String, Object> getFileMetadata(String id) {
+        // Find file in the database
+        File file = findFileById(id);
+        
+        // Get basic file info
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("id", file.getId());
+        metadata.put("contentType", file.getType());
+        metadata.put("fileName", file.getOriginalFileName());
+        
+        // Check if the file exists on disk
+        java.io.File physicalFile = new java.io.File(file.getFilePath());
+        if (physicalFile.exists()) {
+            metadata.put("fileSize", physicalFile.length());
+            metadata.put("lastModified", physicalFile.lastModified());
+        }
+        
+        // Determine if file is previewable
+        boolean isPreviewable = false;
+        String contentType = file.getType();
+        if (contentType != null) {
+            isPreviewable = contentType.startsWith("image/") ||
+                            contentType.equals("application/pdf") ||
+                            contentType.startsWith("text/") ||
+                            contentType.equals("application/json") ||
+                            contentType.equals("application/xml");
+        }
+        metadata.put("isPreviewable", isPreviewable);
+        
+        // Get file extension
+        String extension = "";
+        int lastDot = file.getOriginalFileName().lastIndexOf('.');
+        if (lastDot > 0) {
+            extension = file.getOriginalFileName().substring(lastDot + 1).toLowerCase();
+            metadata.put("extension", extension);
+        }
+        
+        return metadata;
     }
     
     /*

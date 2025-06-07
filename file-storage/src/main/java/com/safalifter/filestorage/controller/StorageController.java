@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("api/v1/file-storage")
@@ -45,7 +46,7 @@ public class StorageController {
     }
 
     @GetMapping("/download/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type"})
+    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
     public ResponseEntity<?> downloadFile(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean preview) {
         try {
             var fileData = storageService.downloadFile(id);
@@ -54,20 +55,35 @@ public class StorageController {
             // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+            headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD");
             headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
             headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
             headers.add("Access-Control-Max-Age", "3600");
+            headers.add("Access-Control-Allow-Credentials", "false");
             
             // Set content type based on file extension and detected type
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
             
+            // Add explicit Content-Length for better browser handling
+            headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileData.getData().length));
+            
             // Set disposition based on preview flag
             if (preview) {
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileData.getFileName() + "\"");
+                
+                // For PDFs, add special headers to improve browser rendering
+                if (contentType.equals("application/pdf")) {
+                    headers.add("X-Content-Type-Options", "nosniff");
+                    headers.add("Accept-Ranges", "bytes");
+                }
             } else {
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileData.getFileName() + "\"");
             }
+            
+            // Add caching headers to prevent caching issues
+            headers.add("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+            headers.add("Pragma", "no-cache");
+            headers.add("Expires", "0");
             
             // Special handling for text files
             if (isTextFile(contentType)) {
@@ -80,7 +96,6 @@ public class StorageController {
             // For all binary files, stream the content with appropriate content type
             return ResponseEntity.ok()
                 .headers(headers)
-                .contentLength(fileData.getData().length)
                 .body(fileData.getData());
         } catch (Exception e) {
             // Log the error
@@ -90,7 +105,7 @@ public class StorageController {
             // Return error response with CORS headers
             HttpHeaders headers = new HttpHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
             headers.add("Access-Control-Allow-Headers", "*");
             
             Map<String, String> error = new HashMap<>();
@@ -98,6 +113,65 @@ public class StorageController {
             return ResponseEntity.internalServerError()
                 .headers(headers)
                 .body(error);
+        }
+    }
+
+    /**
+     * Handle HEAD requests for files - used by browsers to check file before downloading
+     */
+    @RequestMapping(value = "/download/{id}", method = RequestMethod.HEAD)
+    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
+    public ResponseEntity<?> getFileHead(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean preview) {
+        try {
+            // Find the file by ID
+            File file = storageService.findFileById(id);
+            String contentType = determineContentType(file.getOriginalFileName(), file.getType());
+            
+            // Create headers with extensive CORS settings
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
+            headers.add("Access-Control-Max-Age", "3600");
+            headers.add("Access-Control-Allow-Credentials", "false");
+            
+            // Set content type based on file extension and detected type
+            headers.add(HttpHeaders.CONTENT_TYPE, contentType);
+            
+            // Set disposition based on preview flag
+            if (preview) {
+                headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getOriginalFileName() + "\"");
+                
+                // For PDFs, add special headers to improve browser rendering
+                if (contentType.equals("application/pdf")) {
+                    headers.add("X-Content-Type-Options", "nosniff");
+                    headers.add("Accept-Ranges", "bytes");
+                }
+            } else {
+                headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getOriginalFileName() + "\"");
+            }
+            
+            // Add caching headers to prevent caching issues
+            headers.add("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+            headers.add("Pragma", "no-cache");
+            headers.add("Expires", "0");
+            
+            // Return just the headers for a HEAD request (no body)
+            return ResponseEntity.ok().headers(headers).build();
+            
+        } catch (Exception e) {
+            // Log the error
+            System.err.println("Error processing HEAD request: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Return error response with CORS headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).headers(headers).build();
         }
     }
 
@@ -109,23 +183,19 @@ public class StorageController {
     }
 
     @GetMapping("/{id}/metadata")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Type"})
     public ResponseEntity<?> getFileMetadata(@PathVariable String id) {
         try {
-            // Find the file by ID
-            File file = storageService.findFileById(id);
-            
-            // Create a response with just the metadata
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("id", file.getId());
-            metadata.put("contentType", file.getType());
-            metadata.put("fileName", file.getOriginalFileName());
+            // Get file metadata using the service method
+            Map<String, Object> metadata = storageService.getFileMetadata(id);
             
             // Add CORS headers
             HttpHeaders headers = new HttpHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
             headers.add("Access-Control-Allow-Headers", "*");
+            headers.add("Access-Control-Max-Age", "3600");
+            headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
             
             // Return the metadata
             return ResponseEntity.ok()
@@ -140,7 +210,7 @@ public class StorageController {
             // Return error response with CORS headers
             HttpHeaders headers = new HttpHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
             headers.add("Access-Control-Allow-Headers", "*");
             
             Map<String, String> error = new HashMap<>();
@@ -225,5 +295,19 @@ public class StorageController {
             contentType.equals("application/xml") ||
             contentType.equals("application/x-yaml")
         );
+    }
+    
+    /**
+     * Determines if a file type can be previewed in the browser
+     */
+    private boolean isPreviewableType(String contentType) {
+        if (contentType == null) return false;
+        
+        return contentType.startsWith("image/") ||
+               contentType.equals("application/pdf") ||
+               contentType.startsWith("text/") ||
+               contentType.equals("application/json") ||
+               contentType.equals("application/javascript") ||
+               contentType.equals("application/xml");
     }
 }
