@@ -22,7 +22,9 @@ import {
   Plus,
   Users,
   Star,
-  StarHalf
+  StarHalf,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -1154,9 +1156,9 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           
           console.log(`Intentando obtener metadatos para el archivo: ${fileId}`);
           
-          // First, try to get metadata directly
+          // First, try to get metadata using our proxy endpoint instead of direct localhost
           try {
-            const metadataResponse = await fetch(`http://localhost:8222/api/v1/file-storage/${fileId}/metadata`, {
+            const metadataResponse = await fetch(`/api/proxy/file-storage/${fileId}/metadata`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Accept': 'application/json'
@@ -1167,11 +1169,11 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               const metadata = await metadataResponse.json();
               console.log('Metadatos obtenidos:', metadata);
               
-              if (metadata && metadata.name) {
-                setFileName(metadata.name);
+              if (metadata && metadata.fileName) {
+                setFileName(metadata.fileName);
                 
-                if (isNonViewableExtension(metadata.name)) {
-                  setAsNonViewable(metadata.name);
+                if (isNonViewableExtension(metadata.fileName)) {
+                  setAsNonViewable(metadata.fileName);
                   return;
                 }
               }
@@ -1180,6 +1182,9 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             }
           } catch (metadataError) {
             console.error('Error al obtener metadatos:', metadataError);
+            
+            // Don't fail completely, continue with HEAD request
+            console.log('Fallback to HEAD request for file info');
           }
           
           // Si no hay metadatos, intentar hacer HEAD al archivo para verificar el tipo MIME
@@ -1495,19 +1500,72 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               Descargar archivo
             </Button>
             
-            <Button 
+            <Button
               variant="secondary"
               className="w-full sm:w-auto"
-              onClick={handleShowButtonsOnly}
+              onClick={handleRetry}
             >
-              <XCircle className="h-4 w-4 mr-2" />
-              Ocultar vista previa
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reintentar visualización
             </Button>
           </div>
         )}
         
-        <div className="relative w-full h-[400px] border rounded bg-gray-50">
-          {isLoading && (
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center p-4 min-h-[300px]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Cargando documento...</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Si tarda demasiado, puedes usar las opciones para descargar o abrir en una nueva pestaña.
+            </p>
+          </div>
+        )}
+        
+        {/* Error display */}
+        {error && (
+          <div className="flex flex-col items-center justify-center p-4 min-h-[300px] border border-dashed border-destructive rounded-md">
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <p className="text-center text-destructive font-medium mb-2">Error al cargar el documento</p>
+            <p className="text-center text-muted-foreground text-sm mb-4">{error}</p>
+            <div className="flex gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={handleRetry}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reintentar
+              </Button>
+              <Button variant="default" size="sm" onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Using object tag instead of iframe for better file handling */}
+        <object 
+          key={`document-preview-${fileId}-${retryCount}`}
+          data={fileUrl}
+          type="application/pdf"
+          className={`w-full h-full min-h-[500px] border-0 ${isLoading || error ? 'hidden' : ''}`}
+          onLoad={() => {
+            console.log('Documento cargado correctamente');
+            setIsLoading(false);
+          }}
+                    onError={() => {
+            console.error('Error al cargar el documento');
+            setIsLoading(false);
+            setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
+          }}
+        >
+          <p className="text-center text-muted-foreground p-4 border border-dashed rounded-md">
+            No se puede mostrar el documento en esta ventana. Por favor, utilice las opciones para 
+            <Button variant="link" size="sm" onClick={handleOpenInNewTab} className="mx-1">abrir en una nueva pestaña</Button>
+            o 
+            <Button variant="link" size="sm" onClick={handleDownload} className="mx-1">descargar el archivo</Button>
+          </p>
+        </object>
+          <div className="relative w-full h-[400px] border rounded bg-gray-50">
+            {isLoading && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
               <p className="text-gray-500">Cargando documento...</p>

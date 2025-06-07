@@ -58,26 +58,38 @@ export async function GET(
     let error = null;
     
     try {
-      // Try primary URL first
-      console.log(`Attempting request to: ${backendUrl}`);
+      // Try primary URL first with a shorter timeout
+      const primaryController = new AbortController();
+      const primaryTimeoutId = setTimeout(() => primaryController.abort(), 2000); // 2 second timeout for primary URL
       
-      response = await fetch(backendUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': cleanToken,
-          'Accept': '*/*',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        cache: 'no-store',
-        signal: controller.signal
-      });
+      try {
+        console.log(`Attempting request to: ${backendUrl}`);
+        
+        response = await fetch(backendUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': cleanToken,
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store',
+          signal: primaryController.signal
+        });
+        
+        console.log(`Response status from ${backendUrl}: ${response.status}`);
+        clearTimeout(primaryTimeoutId);
+        
+      } catch (primaryError) {
+        clearTimeout(primaryTimeoutId);
+        console.log(`Primary URL error, immediately trying fallback: ${primaryError instanceof Error ? primaryError.message : 'Unknown error'}`);
+        error = primaryError;
+        // Continue to fallback
+      }
       
-      console.log(`Response status from ${backendUrl}: ${response.status}`);
-      
-      // If primary URL fails, try fallback
-      if (!response.ok) {
-        console.log(`Primary URL failed with status ${response.status}, trying fallback URL`);
+      // If primary URL fails or has error, try fallback
+      if (!response || !response.ok) {
+        console.log(`Using fallback URL: ${fallbackUrl}`);
         
         response = await fetch(fallbackUrl, {
           method: 'GET',
