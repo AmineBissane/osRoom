@@ -22,7 +22,7 @@ const SimpleFileDownloader: React.FC<SimpleFileDownloaderProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const downloadFile = () => {
+  const downloadFile = async () => {
     if (!fileId) {
       setError('No file ID provided');
       return;
@@ -36,13 +36,44 @@ const SimpleFileDownloader: React.FC<SimpleFileDownloaderProps> = ({
       const timestamp = new Date().getTime();
       const url = `/api/simple-file/${fileId}?preview=false&t=${timestamp}`;
       
-      // Open in a new tab to download
-      window.open(url, '_blank');
+      // Use fetch instead of window.open to handle authentication properly
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.statusText}`);
+      }
+      
+      // Get the file blob
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element to trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      
+      // Try to get the filename from response headers or use the default
+      const contentDisposition = response.headers.get('content-disposition');
+      const downloadName = 
+        contentDisposition 
+          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') 
+          : fileName || `file-${fileId}`;
+      
+      link.download = downloadName;
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Release the blob URL
+      window.URL.revokeObjectURL(blobUrl);
       
       setLoading(false);
     } catch (err) {
       console.error('Error downloading file:', err);
-      setError('Error downloading file');
+      setError(err instanceof Error ? err.message : 'Error downloading file');
       setLoading(false);
     }
   };

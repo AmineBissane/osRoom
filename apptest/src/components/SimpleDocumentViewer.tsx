@@ -24,14 +24,8 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fileType, setFileType] = useState<'pdf' | 'image' | 'unknown'>('unknown');
-
-  // Build the file URL with timestamp to prevent caching
-  const getFileUrl = (): string => {
-    const timestamp = new Date().getTime();
-    return `/api/simple-file/${fileId}?preview=true&t=${timestamp}`;
-  };
-
-  const fileUrl = getFileUrl();
+  const [fileUrl, setFileUrl] = useState<string>('');
+  const [iframeKey, setIframeKey] = useState<number>(Date.now());
 
   // Determine file type based on fileId or use forced type
   useEffect(() => {
@@ -68,6 +62,49 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
     }
   }, [fileId, forceFileType]);
 
+  // Fetch the file content and create a blob URL for secure viewing
+  useEffect(() => {
+    const fetchFile = async () => {
+      if (!fileId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Add timestamp to prevent caching
+        const timestamp = new Date().getTime();
+        const url = `/api/simple-file/${fileId}?preview=true&t=${timestamp}`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load file: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        setFileUrl(blobUrl);
+        setLoading(false);
+        // Generate a new key for the iframe to force refresh
+        setIframeKey(Date.now());
+      } catch (err) {
+        console.error('Error loading file:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load document');
+        setLoading(false);
+      }
+    };
+    
+    fetchFile();
+    
+    // Cleanup function to revoke object URL
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+    };
+  }, [fileId]);
+
   // Handle loading state
   const handleLoad = () => {
     setLoading(false);
@@ -103,38 +140,31 @@ const SimpleDocumentViewer: React.FC<SimpleDocumentViewerProps> = ({
         </div>
       ) : (
         <>
-          {fileType === 'pdf' ? (
-            <object
-              data={fileUrl}
-              type="application/pdf"
-              width={width}
-              height={height}
-              className={loading ? 'hidden' : ''}
-              onLoad={handleLoad}
-              onError={handleError}
-            >
-              <p>
-                Unable to display PDF file. 
-                <SimpleFileDownloader 
-                  fileId={fileId} 
-                  buttonText="Download Instead" 
-                  buttonVariant="link"
-                  className="ml-2"
-                />
-              </p>
-            </object>
-          ) : (
-            <img
-              src={fileUrl}
-              alt="Document preview"
-              className={`max-w-full ${loading ? 'hidden' : ''}`}
-              style={{ maxHeight: height }}
-              onLoad={handleLoad}
-              onError={handleError}
-            />
+          {fileUrl && (
+            fileType === 'pdf' ? (
+              <iframe
+                key={iframeKey}
+                src={fileUrl}
+                width={width}
+                height={height}
+                className={loading ? 'hidden' : ''}
+                onLoad={handleLoad}
+                onError={handleError}
+                style={{ border: 'none' }}
+              />
+            ) : (
+              <img
+                src={fileUrl}
+                alt="Document preview"
+                className={`max-w-full ${loading ? 'hidden' : ''}`}
+                style={{ maxHeight: height }}
+                onLoad={handleLoad}
+                onError={handleError}
+              />
+            )
           )}
           
-          {showDownloadButton && !loading && !error && (
+          {showDownloadButton && !loading && !error && fileUrl && (
             <div className="mt-2">
               <SimpleFileDownloader 
                 fileId={fileId} 
