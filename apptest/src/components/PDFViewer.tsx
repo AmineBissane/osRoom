@@ -1,188 +1,165 @@
 import { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Download, ExternalLink, RefreshCcw } from 'lucide-react';
 
 interface PDFViewerProps {
   fileUrl: string;
   height?: string;
   width?: string;
+  showControls?: boolean;
 }
 
-export default function PDFViewer({ fileUrl, height = '600px', width = '100%' }: PDFViewerProps) {
+export default function PDFViewer({ 
+  fileUrl, 
+  height = '600px', 
+  width = '100%',
+  showControls = true 
+}: PDFViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewerType, setViewerType] = useState<'object' | 'iframe' | 'embed' | 'failed'>('object');
   const objectRef = useRef<HTMLObjectElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const embedRef = useRef<HTMLEmbedElement>(null);
+  
+  // Add timestamp to URL to prevent caching
+  const getUrlWithTimestamp = (url: string) => {
+    const timestamp = new Date().getTime();
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${timestamp}`;
+  };
 
-  // Add a timestamp to prevent caching
-  const urlWithTimestamp = fileUrl.includes('?') 
-    ? `${fileUrl}&nocache=${new Date().getTime()}` 
-    : `${fileUrl}?nocache=${new Date().getTime()}`;
-
-  useEffect(() => {
-    // Check if the URL is valid
-    if (!fileUrl) {
-      setError('No file URL provided');
-      setLoading(false);
-      return;
-    }
-
-    // Reset state when URL changes
+  // Handle reload button click
+  const handleReload = () => {
     setLoading(true);
-    setError(null);
-    setViewerType('object');
-
-    // Set a timeout to try different approaches
-    const objectTimeout = setTimeout(() => {
-      if (loading) {
-        console.log('Object tag timeout, trying iframe');
-        setViewerType('iframe');
+    
+    // Force reload by recreating the object tag
+    if (objectRef.current) {
+      const parent = objectRef.current.parentElement;
+      if (parent) {
+        const newObject = document.createElement('object');
+        newObject.setAttribute('data', getUrlWithTimestamp(fileUrl));
+        newObject.setAttribute('type', 'application/pdf');
+        newObject.setAttribute('width', '100%');
+        newObject.setAttribute('height', '100%');
+        newObject.className = 'border-0';
         
-        // Give iframe a chance to load
-        const iframeTimeout = setTimeout(() => {
-          if (loading) {
-            console.log('Iframe timeout, trying embed');
-            setViewerType('embed');
-            
-            // Give embed a chance to load
-            const embedTimeout = setTimeout(() => {
-              if (loading) {
-                console.log('All viewers failed');
-                setError('PDF loading timed out. Please try opening in a new tab.');
-                setViewerType('failed');
-                setLoading(false);
-              }
-            }, 5000);
-            
-            return () => clearTimeout(embedTimeout);
-          }
-        }, 5000);
+        // Add fallback content
+        const fallback = document.createElement('p');
+        fallback.textContent = 'Your browser does not support PDFs. ';
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.target = '_blank';
+        link.rel = 'noreferrer';
+        link.textContent = 'Click here to view the PDF';
+        fallback.appendChild(link);
+        newObject.appendChild(fallback);
         
-        return () => clearTimeout(iframeTimeout);
+        // Replace the old object with the new one
+        parent.replaceChild(newObject, objectRef.current);
+        objectRef.current = newObject as HTMLObjectElement;
       }
-    }, 5000);
-
-    return () => {
-      clearTimeout(objectTimeout);
-    };
-  }, [fileUrl, loading]);
-
-  const handleLoad = () => {
-    console.log(`PDF loaded successfully using ${viewerType}`);
-    setLoading(false);
-  };
-
-  const handleError = () => {
-    console.error(`Failed to load PDF using ${viewerType}`);
-    if (viewerType === 'object') {
-      setViewerType('iframe');
-    } else if (viewerType === 'iframe') {
-      setViewerType('embed');
-    } else {
-      setError('Failed to load PDF. Please try opening in a new tab.');
-      setViewerType('failed');
-      setLoading(false);
     }
+    
+    // Reset loading state after a short delay
+    setTimeout(() => setLoading(false), 1000);
   };
 
+  // Open in new tab
   const openInNewTab = () => {
     window.open(fileUrl, '_blank');
   };
 
+  // Download file
   const downloadFile = () => {
-    // Create a direct download link
-    const a = document.createElement('a');
-    a.href = fileUrl;
-    a.download = 'document.pdf';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // Change preview=true to preview=false to trigger download
+    const downloadUrl = fileUrl.replace('preview=true', 'preview=false');
+    window.open(downloadUrl, '_blank');
   };
 
-  if (viewerType === 'failed' || error) {
-    return (
-      <div className="flex flex-col items-center justify-center bg-gray-100 p-4" style={{ height }}>
-        <p className="text-red-500 mb-4">{error || 'No se pudo cargar el PDF'}</p>
-        <div className="flex space-x-4">
-          <button 
-            onClick={openInNewTab}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Abrir en nueva pestaña
-          </button>
-          <button 
-            onClick={downloadFile}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-          >
-            Descargar PDF
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Monitor loading state
+  useEffect(() => {
+    const checkLoading = () => {
+      if (objectRef.current) {
+        setLoading(false);
+      }
+    };
+    
+    // Set timeout to check loading state
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setError('PDF may be taking too long to load. Try reloading or opening in a new tab.');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+    
+    // Try to detect when PDF is loaded
+    window.addEventListener('load', checkLoading);
+    
+    return () => {
+      window.removeEventListener('load', checkLoading);
+      clearTimeout(timeout);
+    };
+  }, [loading, fileUrl]);
 
   return (
-    <div className="pdf-viewer-container" style={{ width, height, position: 'relative' }}>
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-        </div>
-      )}
-      
-      {viewerType === 'object' && (
+    <div className="relative" style={{ width, height }}>
+      {/* PDF Viewer */}
+      <div className="w-full h-full">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="flex flex-col items-center justify-center p-4 h-full">
+            <p className="text-red-500 mb-4">{error}</p>
+            <div className="flex gap-2">
+              <Button onClick={handleReload} variant="default">
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Reload
+              </Button>
+              <Button onClick={openInNewTab} variant="outline">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in new tab
+              </Button>
+            </div>
+          </div>
+        )}
+        
         <object
           ref={objectRef}
-          data={urlWithTimestamp}
+          data={getUrlWithTimestamp(fileUrl)}
           type="application/pdf"
-          width={width}
-          height={height}
+          width="100%"
+          height="100%"
           className="border-0"
-          onLoad={handleLoad}
-          onError={handleError}
+          onLoad={() => setLoading(false)}
+          onError={() => setError('Failed to load PDF')}
         >
-          <p>Su navegador no puede mostrar el PDF.</p>
+          <p>
+            Your browser does not support PDFs.
+            <a href={fileUrl} target="_blank" rel="noreferrer">Click here to view the PDF</a>
+          </p>
         </object>
-      )}
-      
-      {viewerType === 'iframe' && (
-        <iframe
-          ref={iframeRef}
-          src={urlWithTimestamp}
-          style={{ width: '100%', height: '100%', border: 'none' }}
-          onLoad={handleLoad}
-          onError={handleError}
-          title="PDF Viewer"
-          sandbox="allow-same-origin allow-scripts"
-        />
-      )}
-      
-      {viewerType === 'embed' && (
-        <embed
-          ref={embedRef}
-          src={urlWithTimestamp}
-          type="application/pdf"
-          width={width}
-          height={height}
-          onLoad={handleLoad}
-          onError={handleError}
-        />
-      )}
-      
-      {/* Fallback buttons always available */}
-      <div className="absolute bottom-4 right-4 flex space-x-2">
-        <button 
-          onClick={openInNewTab}
-          className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 opacity-80 hover:opacity-100"
-        >
-          Abrir
-        </button>
-        <button 
-          onClick={downloadFile}
-          className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 opacity-80 hover:opacity-100"
-        >
-          Descargar
-        </button>
       </div>
+      
+      {/* Controls */}
+      {showControls && !loading && !error && (
+        <div className="absolute bottom-4 right-4 flex gap-2">
+          <Button onClick={handleReload} variant="ghost" size="sm" className="opacity-80 hover:opacity-100">
+            <RefreshCcw className="h-4 w-4 mr-1" />
+            Reload
+          </Button>
+          <Button onClick={openInNewTab} variant="default" size="sm" className="opacity-80 hover:opacity-100">
+            <ExternalLink className="h-4 w-4 mr-1" />
+            Open
+          </Button>
+          <Button onClick={downloadFile} variant="outline" size="sm" className="opacity-80 hover:opacity-100">
+            <Download className="h-4 w-4 mr-1" />
+            Download
+          </Button>
+        </div>
+      )}
     </div>
   );
 } 

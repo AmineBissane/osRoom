@@ -56,7 +56,7 @@ export default function DirectFileViewer({
 
       // Generate URL with timestamp to prevent caching
       const timestamp = new Date().getTime();
-      const url = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
+      const url = `/api/proxy/file-storage/direct-view/${fileId}?preview=true&t=${timestamp}`;
       
       console.log('Fetching file using blob approach:', url);
       
@@ -239,25 +239,112 @@ export default function DirectFileViewer({
       }
       
       // For PDFs
-      if (fileType === 'application/pdf') {
+      if (fileType === 'application/pdf' || objectUrl?.toLowerCase().endsWith('.pdf')) {
         return (
-          <object
-            ref={objectRef}
-            data={objectUrl}
-            type="application/pdf"
-            width="100%"
-            height="100%"
-            className="border-0"
-          >
-            <iframe
-              ref={iframeRef}
-              src={objectUrl}
+          <div className="w-full h-full">
+            <object
+              ref={objectRef}
+              data={objectUrl}
+              type="application/pdf"
               width="100%"
               height="100%"
               className="border-0"
-              title="PDF Viewer"
+            >
+              <p>Your browser does not support PDFs. 
+                <a href={objectUrl} target="_blank" rel="noreferrer">Click here to view the PDF</a>
+              </p>
+            </object>
+          </div>
+        );
+      }
+      
+      // For audio files
+      if (fileType?.startsWith('audio/')) {
+        return (
+          <div className="w-full flex flex-col items-center justify-center p-4">
+            <audio controls className="w-full max-w-md">
+              <source src={objectUrl} type={fileType} />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        );
+      }
+      
+      // For video files
+      if (fileType?.startsWith('video/')) {
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <video 
+              controls 
+              className="max-w-full max-h-full object-contain"
+              style={{ maxHeight: 'calc(100% - 20px)' }}
+            >
+              <source src={objectUrl} type={fileType} />
+              Your browser does not support the video element.
+            </video>
+          </div>
+        );
+      }
+      
+      // For text files, JSON, CSV, etc.
+      if (fileType?.startsWith('text/') || 
+          fileType === 'application/json' || 
+          fileType === 'application/csv' ||
+          fileType === 'application/xml') {
+        
+        const [textContent, setTextContent] = useState<string | null>(null);
+        
+        useEffect(() => {
+          const fetchTextContent = async () => {
+            try {
+              if (objectUrl) {
+                const response = await fetch(objectUrl);
+                const text = await response.text();
+                setTextContent(text);
+              }
+            } catch (err) {
+              console.error('Error fetching text content:', err);
+            }
+          };
+          
+          fetchTextContent();
+          
+          return () => {
+            // Cleanup
+          };
+        }, [objectUrl]);
+        
+        return (
+          <div className="w-full h-full overflow-auto">
+            {textContent ? (
+              <pre className="p-4 text-sm font-mono whitespace-pre-wrap bg-gray-50 border rounded h-full overflow-auto">
+                {textContent}
+              </pre>
+            ) : (
+              <div className="flex justify-center items-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+              </div>
+            )}
+          </div>
+        );
+      }
+      
+      // For Office documents (Word, Excel, PowerPoint)
+      if (fileType?.includes('officedocument') || 
+          fileType?.includes('msword') || 
+          fileType?.includes('ms-excel') ||
+          fileType?.includes('ms-powerpoint')) {
+        return (
+          <div className="w-full h-full">
+            <iframe
+              ref={iframeRef}
+              src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + '/api/proxy/file-storage/download/' + fileId + '?preview=true')}`}
+              width="100%"
+              height="100%"
+              className="border-0"
+              title="Office Document Viewer"
             />
-          </object>
+          </div>
         );
       }
       

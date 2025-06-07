@@ -994,24 +994,48 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     return `/api/proxy/file-storage/download/${fileId}`;
   };
 
+  // Get the PDF-specific URL for the PDF viewer
+  const getPdfUrl = (fileId: string | undefined): string => {
+    if (!fileId) return '';
+    // Use our specialized PDF endpoint
+    return `/api/proxy/file-storage/pdf/${fileId}?preview=true`;
+  };
+  
+  // Check if a file is a PDF (will check via API)
+  const checkIsPdf = async (fileId: string | undefined): Promise<boolean> => {
+    if (!fileId) return false;
+    
+    try {
+      const response = await fetch(`/api/proxy/file-storage/${fileId}/metadata`);
+      if (!response.ok) return false;
+      
+      const metadata = await response.json();
+      return metadata.contentType?.includes('pdf') || 
+             metadata.fileName?.toLowerCase().endsWith('.pdf');
+    } catch (error) {
+      console.error('Error checking file type:', error);
+      return false;
+    }
+  };
+
   // DocumentPreview component to preview files
   const DocumentPreview = ({ fileId, hideButtons = false }: { fileId: string | undefined, hideButtons?: boolean }) => {
-    // Use the DirectFileViewer component for all files
-    if (fileId) {
-      return <DirectFileViewer fileId={fileId} height="600px" showControls={!hideButtons} />;
+    if (!fileId) {
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     }
     
-    return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+    // Use the enhanced DirectFileViewer for all file types
+    return <DirectFileViewer fileId={fileId} height="600px" showControls={!hideButtons} />;
   };
 
   // Direct document preview component for response details dialog
   const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
-    // For PDF files, try using the DirectFileViewer first
-    if (fileId) {
-      return <DirectFileViewer fileId={fileId} height="600px" />;
+    if (!fileId) {
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     }
     
-    return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+    // Use the enhanced DirectFileViewer for all file types
+    return <DirectFileViewer fileId={fileId} height="600px" />;
   };
 
   // Add safety timeout for loading state

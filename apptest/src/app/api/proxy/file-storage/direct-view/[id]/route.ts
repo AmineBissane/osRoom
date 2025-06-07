@@ -14,6 +14,63 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
+/**
+ * Determine the appropriate content type based on file extension and provided content type
+ */
+function determineContentType(fileName: string | null, contentType: string | null): string {
+  // Default content type
+  const defaultType = 'application/octet-stream';
+  
+  // If we have a valid content type that's not octet-stream, use it
+  if (contentType && contentType !== defaultType) {
+    return contentType;
+  }
+  
+  // If we have a filename, try to determine content type from extension
+  if (fileName) {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    if (extension) {
+      // Common file types
+      const typeMap: Record<string, string> = {
+        'pdf': 'application/pdf',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'svg': 'image/svg+xml',
+        'webp': 'image/webp',
+        'txt': 'text/plain',
+        'html': 'text/html',
+        'css': 'text/css',
+        'js': 'application/javascript',
+        'json': 'application/json',
+        'xml': 'application/xml',
+        'csv': 'text/csv',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'mp3': 'audio/mpeg',
+        'mp4': 'video/mp4',
+        'wav': 'audio/wav',
+        'ogg': 'audio/ogg',
+        'webm': 'video/webm',
+        'zip': 'application/zip',
+        'rar': 'application/x-rar-compressed',
+        'tar': 'application/x-tar',
+        'gz': 'application/gzip'
+      };
+      
+      return typeMap[extension] || defaultType;
+    }
+  }
+  
+  return defaultType;
+}
+
 // Force dynamic to prevent caching
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -47,14 +104,17 @@ export async function GET(
     // Direct URL to the backend API
     const apiUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`;
     
-    // Fetch the file directly
+    // Fetch the file directly with enhanced options
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Authorization': cleanToken,
-        'Accept': '*/*'
+        'Accept': '*/*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
       },
-      cache: 'no-store'
+      cache: 'no-store',
+      next: { revalidate: 0 }
     });
     
     if (!response.ok) {
@@ -80,13 +140,17 @@ export async function GET(
     // Get content type and disposition from headers
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
+    const fileName = contentDisposition?.match(/filename="?([^"]+)"?/)?.[1] || `file-${id}`;
     
-    console.log(`Content type: ${contentType}`);
+    console.log(`Content type: ${contentType}, File name: ${fileName}`);
+    
+    // Determine the proper content type
+    const detectedContentType = determineContentType(fileName, contentType);
     
     // For previews, use inline disposition
     const disposition = isPreview 
       ? 'inline'
-      : (contentDisposition || `attachment; filename="file-${id}"`);
+      : (contentDisposition || `attachment; filename="${fileName}"`);
     
     // Get the response data
     const data = await response.arrayBuffer();
@@ -94,7 +158,7 @@ export async function GET(
     
     // Set appropriate headers
     const headers = new Headers();
-    headers.set('Content-Type', contentType);
+    headers.set('Content-Type', detectedContentType);
     headers.set('Content-Disposition', disposition);
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     headers.set('Pragma', 'no-cache');
@@ -104,14 +168,15 @@ export async function GET(
     headers.set('Access-Control-Allow-Origin', '*');
     headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
     headers.set('Access-Control-Allow-Credentials', 'true');
     
     // Add content length
     headers.set('Content-Length', data.byteLength.toString());
     
-    // For PDF files, ensure proper content type
-    if (contentType.includes('pdf')) {
-      headers.set('Content-Type', 'application/pdf');
+    // Special handling for different file types
+    if (detectedContentType.includes('pdf')) {
+      headers.set('X-Content-Type-Options', 'nosniff');
     }
     
     // Return the data with appropriate headers

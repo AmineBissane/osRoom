@@ -56,52 +56,32 @@ public class StorageController {
             headers.add("Access-Control-Allow-Origin", "*");
             headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
             headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length");
+            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
             headers.add("Access-Control-Max-Age", "3600");
             
+            // Set content type based on file extension and detected type
+            headers.add(HttpHeaders.CONTENT_TYPE, contentType);
+            
+            // Set disposition based on preview flag
             if (preview) {
-                // For preview, use inline disposition
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileData.getFileName() + "\"");
             } else {
-                // For download, use attachment disposition
                 headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileData.getFileName() + "\"");
             }
             
             // Special handling for text files
-            if (isTextFile(fileData.getFileName(), contentType)) {
-                // For text files, convert to UTF-8 string and set proper content type
+            if (isTextFile(contentType)) {
                 String textContent = new String(fileData.getData(), StandardCharsets.UTF_8);
-                headers.add(HttpHeaders.CONTENT_TYPE, "text/plain; charset=UTF-8");
                 return ResponseEntity.ok()
                     .headers(headers)
                     .body(textContent);
             }
             
-            // For PDF files, ensure proper content type
-            if (contentType.equals("application/pdf")) {
-                headers.add(HttpHeaders.CONTENT_TYPE, "application/pdf");
-                return ResponseEntity.ok()
-                    .headers(headers)
-                    .contentLength(fileData.getData().length)
-                    .body(fileData.getData());
-            }
-            
-            // For images, ensure proper content type
-            if (contentType.startsWith("image/")) {
-                headers.add(HttpHeaders.CONTENT_TYPE, contentType);
-                return ResponseEntity.ok()
-                    .headers(headers)
-                    .contentLength(fileData.getData().length)
-                    .body(fileData.getData());
-            }
-            
-            // For all other binary files, stream the content
+            // For all binary files, stream the content with appropriate content type
             return ResponseEntity.ok()
                 .headers(headers)
-                .contentType(MediaType.parseMediaType(contentType))
                 .contentLength(fileData.getData().length)
                 .body(fileData.getData());
-                
         } catch (Exception e) {
             // Log the error
             System.err.println("Error downloading file: " + e.getMessage());
@@ -130,74 +110,120 @@ public class StorageController {
 
     @GetMapping("/{id}/metadata")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
-    public ResponseEntity<Map<String, Object>> getFileMetadata(@PathVariable String id) {
-        File fileRecord = storageService.findFileById(id);
-        
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("id", fileRecord.getId());
-        metadata.put("fileName", fileRecord.getOriginalFileName());
-        metadata.put("contentType", determineContentType(fileRecord.getOriginalFileName(), fileRecord.getType()));
-        
-        return ResponseEntity.ok(metadata);
-    }
-    
-    private String determineContentType(String fileName, String defaultType) {
-        if (fileName == null) {
-            return defaultType != null ? defaultType : "application/octet-stream";
-        }
-        
-        String lowerFileName = fileName.toLowerCase();
-        String extension = lowerFileName.lastIndexOf('.') > -1 
-            ? lowerFileName.substring(lowerFileName.lastIndexOf('.')) 
-            : "";
+    public ResponseEntity<?> getFileMetadata(@PathVariable String id) {
+        try {
+            // Find the file by ID
+            File file = storageService.findFileById(id);
             
-        // Check if it's a text file by extension
-        if (TEXT_EXTENSIONS.contains(extension)) {
-            return "text/plain; charset=UTF-8";
-        }
-        
-        // Use the default content type if provided and valid
-        if (defaultType != null && !defaultType.equals("application/octet-stream")) {
-            return defaultType;
-        }
-        
-        // Fallback to common content types based on extension
-        switch (extension) {
-            case ".pdf": return "application/pdf";
-            case ".jpg":
-            case ".jpeg": return "image/jpeg";
-            case ".png": return "image/png";
-            case ".gif": return "image/gif";
-            case ".doc": return "application/msword";
-            case ".docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            case ".xls": return "application/vnd.ms-excel";
-            case ".xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            default: return "application/octet-stream";
+            // Create a response with just the metadata
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("id", file.getId());
+            metadata.put("contentType", file.getType());
+            metadata.put("fileName", file.getOriginalFileName());
+            
+            // Add CORS headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            
+            // Return the metadata
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(metadata);
+            
+        } catch (Exception e) {
+            // Log the error
+            System.err.println("Error getting file metadata: " + e.getMessage());
+            e.printStackTrace();
+            
+            // Return error response with CORS headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to get file metadata: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                .headers(headers)
+                .body(error);
         }
     }
     
-    private boolean isTextFile(String fileName, String contentType) {
-        if (contentType == null) {
-            return false;
+    /**
+     * Determines the correct content type based on file name and provided content type
+     */
+    private String determineContentType(String fileName, String providedContentType) {
+        // Default content type
+        String defaultType = "application/octet-stream";
+        
+        // If we have a valid content type that's not octet-stream, use it
+        if (providedContentType != null && !providedContentType.equals(defaultType)) {
+            return providedContentType;
         }
         
-        // Check by content type
-        boolean isTextByMimetype = TEXT_MIMETYPES.stream()
-            .anyMatch(textType -> contentType.toLowerCase().startsWith(textType));
-            
-        if (isTextByMimetype) {
-            return true;
-        }
-        
-        // Check by extension
+        // If we have a filename, try to determine content type from extension
         if (fileName != null) {
-            String lowerFileName = fileName.toLowerCase();
-            String extension = lowerFileName.lastIndexOf('.') > -1 
-                ? lowerFileName.substring(lowerFileName.lastIndexOf('.')) 
-                : "";
-            return TEXT_EXTENSIONS.contains(extension);
+            String extension = "";
+            int lastDot = fileName.lastIndexOf('.');
+            if (lastDot > 0) {
+                extension = fileName.substring(lastDot + 1).toLowerCase();
+            }
+            
+            if (!extension.isEmpty()) {
+                // Common file types mapping
+                Map<String, String> typeMap = new HashMap<>();
+                typeMap.put("pdf", "application/pdf");
+                typeMap.put("jpg", "image/jpeg");
+                typeMap.put("jpeg", "image/jpeg");
+                typeMap.put("png", "image/png");
+                typeMap.put("gif", "image/gif");
+                typeMap.put("svg", "image/svg+xml");
+                typeMap.put("webp", "image/webp");
+                typeMap.put("txt", "text/plain");
+                typeMap.put("html", "text/html");
+                typeMap.put("css", "text/css");
+                typeMap.put("js", "application/javascript");
+                typeMap.put("json", "application/json");
+                typeMap.put("xml", "application/xml");
+                typeMap.put("csv", "text/csv");
+                typeMap.put("doc", "application/msword");
+                typeMap.put("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+                typeMap.put("xls", "application/vnd.ms-excel");
+                typeMap.put("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                typeMap.put("ppt", "application/vnd.ms-powerpoint");
+                typeMap.put("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+                typeMap.put("mp3", "audio/mpeg");
+                typeMap.put("mp4", "video/mp4");
+                typeMap.put("wav", "audio/wav");
+                typeMap.put("ogg", "audio/ogg");
+                typeMap.put("webm", "video/webm");
+                typeMap.put("zip", "application/zip");
+                typeMap.put("rar", "application/x-rar-compressed");
+                typeMap.put("tar", "application/x-tar");
+                typeMap.put("gz", "application/gzip");
+                
+                String contentType = typeMap.get(extension);
+                if (contentType != null) {
+                    return contentType;
+                }
+            }
         }
         
-        return false;
+        return defaultType;
+    }
+    
+    /**
+     * Checks if the content type is a text file type
+     */
+    private boolean isTextFile(String contentType) {
+        return contentType != null && (
+            contentType.startsWith("text/") ||
+            contentType.equals("application/json") ||
+            contentType.equals("application/javascript") ||
+            contentType.equals("application/xml") ||
+            contentType.equals("application/x-yaml")
+        );
     }
 }
