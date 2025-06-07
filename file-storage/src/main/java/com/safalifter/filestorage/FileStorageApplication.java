@@ -22,11 +22,13 @@ public class FileStorageApplication {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOrigins("*")
-                        .allowedMethods("*")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH")
                         .allowedHeaders("*")
-                        .exposedHeaders("Content-Disposition", "Content-Type")
-                        .allowCredentials(false)
+                        .exposedHeaders("Content-Disposition", "Content-Type", "Content-Length", "Accept-Ranges")
+                        .allowCredentials(true)
                         .maxAge(3600);
+                
+                System.out.println("CORS configuration applied to all endpoints");
             }
         };
     }

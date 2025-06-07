@@ -24,11 +24,19 @@ public class CorsFilter implements Filter {
         
         // CRITICAL: Set CORS headers BEFORE any processing
         response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Credentials", "false");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH");
         response.setHeader("Access-Control-Max-Age", "3600");
         response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-CSRF-Token");
         response.setHeader("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, Accept-Ranges, Content-Range");
+        
+        // Remove X-Frame-Options: DENY to allow embedding in iframes
+        // Instead, use a more permissive approach for embedding content
+        response.setHeader("X-Frame-Options", "SAMEORIGIN");
+        
+        // Add these headers to improve browser compatibility
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-XSS-Protection", "1; mode=block");
         
         // Debug headers - remove in production
         response.setHeader("X-Debug-CORS", "Applied");
@@ -40,6 +48,13 @@ public class CorsFilter implements Filter {
         System.out.println("URI: " + request.getRequestURI());
         System.out.println("Method: " + request.getMethod());
         System.out.println("Origin: " + (origin != null ? origin : "null"));
+        
+        // Print all request headers for debugging
+        java.util.Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            String headerName = headerNames.nextElement();
+            System.out.println("Header: " + headerName + " = " + request.getHeader(headerName));
+        }
         System.out.println("========================");
         
         // Handle preflight OPTIONS requests

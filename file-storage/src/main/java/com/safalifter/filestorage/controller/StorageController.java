@@ -47,10 +47,20 @@ public class StorageController {
 
     @GetMapping("/download/{id}")
     @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
-    public ResponseEntity<?> downloadFile(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean preview) {
+    public ResponseEntity<?> downloadFile(@PathVariable String id, 
+                                         @RequestParam(required = false, defaultValue = "false") boolean preview,
+                                         @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
+            System.out.println("Download request for file ID: " + id);
+            System.out.println("Preview mode: " + preview);
+            System.out.println("Auth header present: " + (authHeader != null ? "yes" : "no"));
+            
             var fileData = storageService.downloadFile(id);
             String contentType = determineContentType(fileData.getFileName(), fileData.getContentType());
+            
+            // Log content type for debugging
+            System.out.println("Content type: " + contentType);
+            System.out.println("File size: " + fileData.getData().length + " bytes");
             
             // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
@@ -59,7 +69,7 @@ public class StorageController {
             headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
             headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
             headers.add("Access-Control-Max-Age", "3600");
-            headers.add("Access-Control-Allow-Credentials", "false");
+            headers.add("Access-Control-Allow-Credentials", "true");
             
             // Set content type based on file extension and detected type
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
@@ -84,6 +94,9 @@ public class StorageController {
             headers.add("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
             headers.add("Pragma", "no-cache");
             headers.add("Expires", "0");
+            
+            // Allow embedding in iframe
+            headers.add("X-Frame-Options", "SAMEORIGIN");
             
             // Special handling for text files
             if (isTextFile(contentType)) {
