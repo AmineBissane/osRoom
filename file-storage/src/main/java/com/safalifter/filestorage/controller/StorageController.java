@@ -1,29 +1,22 @@
 package com.safalifter.filestorage.controller;
 
 import com.safalifter.filestorage.model.File;
+import com.safalifter.filestorage.model.FileData;
 import com.safalifter.filestorage.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.InputStreamResource;
-
-import com.safalifter.filestorage.model.FileData;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
-import org.springframework.http.HttpStatus;
 
+// No Cross-Origin annotations at controller level since we have a global CORS configuration
 @RestController
 @RequestMapping("api/v1/file-storage")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type"})
 public class StorageController {
     private final StorageService storageService;
     
@@ -40,13 +33,11 @@ public class StorageController {
     );
 
     @PostMapping("/upload")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
-    public ResponseEntity<String> uploadFileToFileSystem(@RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok().body(storageService.uploadFile(file));
+    public ResponseEntity<String> uploadFile(@RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(storageService.uploadFile(file));
     }
 
     @GetMapping("/download/{id}")
-    @CrossOrigin(allowCredentials = "true", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
     public ResponseEntity<?> downloadFile(@PathVariable String id, 
                                          @RequestParam(required = false, defaultValue = "false") boolean preview,
                                          @RequestHeader(value = "Authorization", required = false) String authHeader,
@@ -146,108 +137,34 @@ public class StorageController {
         }
     }
 
-    /**
-     * Handle HEAD requests for files - used by browsers to check file before downloading
-     */
     @RequestMapping(value = "/download/{id}", method = RequestMethod.HEAD)
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
-    public ResponseEntity<?> getFileHead(@PathVariable String id, @RequestParam(required = false, defaultValue = "false") boolean preview) {
+    public ResponseEntity<?> getFileHead(@PathVariable String id, 
+                                        @RequestParam(required = false, defaultValue = "false") boolean preview) {
         try {
-            // Find the file by ID
-            File file = storageService.findFileById(id);
-            String contentType = determineContentType(file.getOriginalFileName(), file.getType());
+            var file = storageService.findFileById(id);
             
-            // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
-            headers.add("Access-Control-Max-Age", "3600");
-            headers.add("Access-Control-Allow-Credentials", "false");
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, preview ? "inline" : "attachment");
+            headers.add(HttpHeaders.CONTENT_TYPE, file.getType());
             
-            // Set content type based on file extension and detected type
-            headers.add(HttpHeaders.CONTENT_TYPE, contentType);
-            
-            // Set disposition based on preview flag
-            if (preview) {
-                headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getOriginalFileName() + "\"");
-                
-                // For PDFs, add special headers to improve browser rendering
-                if (contentType.equals("application/pdf")) {
-                    headers.add("X-Content-Type-Options", "nosniff");
-                    headers.add("Accept-Ranges", "bytes");
-                }
-            } else {
-                headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getOriginalFileName() + "\"");
-            }
-            
-            // Add caching headers to prevent caching issues
-            headers.add("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-            headers.add("Pragma", "no-cache");
-            headers.add("Expires", "0");
-            
-            // Return just the headers for a HEAD request (no body)
             return ResponseEntity.ok().headers(headers).build();
-            
         } catch (Exception e) {
-            // Log the error
-            System.err.println("Error processing HEAD request: " + e.getMessage());
-            e.printStackTrace();
-            
-            // Return error response with CORS headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            headers.add("Access-Control-Allow-Headers", "*");
-            
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).headers(headers).build();
+            return ResponseEntity.notFound().build();
         }
     }
 
     @DeleteMapping("/delete/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
-    public ResponseEntity<Void> deleteFileFromFileSystem(@PathVariable String id) {
+    public ResponseEntity<Void> deleteFile(@PathVariable String id) {
         storageService.deleteFile(id);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/metadata")
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Type"})
     public ResponseEntity<?> getFileMetadata(@PathVariable String id) {
         try {
-            // Get file metadata using the service method
-            Map<String, Object> metadata = storageService.getFileMetadata(id);
-            
-            // Add CORS headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
-            headers.add("Access-Control-Allow-Headers", "*");
-            headers.add("Access-Control-Max-Age", "3600");
-            headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
-            
-            // Return the metadata
-            return ResponseEntity.ok()
-                .headers(headers)
-                .body(metadata);
-            
+            return ResponseEntity.ok(storageService.getFileMetadata(id));
         } catch (Exception e) {
-            // Log the error
-            System.err.println("Error getting file metadata: " + e.getMessage());
-            e.printStackTrace();
-            
-            // Return error response with CORS headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
-            headers.add("Access-Control-Allow-Headers", "*");
-            
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to get file metadata: " + e.getMessage());
-            return ResponseEntity.internalServerError()
-                .headers(headers)
-                .body(error);
+            return ResponseEntity.notFound().build();
         }
     }
     

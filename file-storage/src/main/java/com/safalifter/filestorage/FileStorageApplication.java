@@ -22,9 +22,9 @@ public class FileStorageApplication {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOriginPatterns("*")
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                         .allowedHeaders("*")
-                        .exposedHeaders("Content-Disposition", "Content-Type", "Content-Length", "Accept-Ranges")
+                        .exposedHeaders("Content-Disposition", "Content-Type", "Content-Length")
                         .allowCredentials(true)
                         .maxAge(3600);
                 

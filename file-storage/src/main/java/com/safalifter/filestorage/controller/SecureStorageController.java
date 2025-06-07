@@ -21,7 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("api/v1/secure-storage")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type"})
 public class SecureStorageController {
 
     private final SecureStorageService secureStorageService;
@@ -30,7 +29,6 @@ public class SecureStorageController {
      * Upload and encrypt a file
      */
     @PostMapping("/upload")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<String> uploadSecureFile(@RequestPart("file") MultipartFile file) {
         String fileId = secureStorageService.uploadSecureFile(file);
         return ResponseEntity.ok("File securely encrypted and stored with ID: " + fileId);
@@ -40,18 +38,12 @@ public class SecureStorageController {
      * Download and decrypt a file
      */
     @GetMapping("/download/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
     public ResponseEntity<byte[]> downloadSecureFile(@PathVariable String id, 
                                                      @RequestParam(required = false, defaultValue = "false") boolean preview) {
         try {
             FileData fileData = secureStorageService.downloadSecureFile(id);
             
             HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
-            headers.add("Access-Control-Max-Age", "3600");
             
             // Determine content type
             MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
@@ -97,7 +89,6 @@ public class SecureStorageController {
      * Handle HEAD requests for secure files
      */
     @RequestMapping(value = "/download/{id}", method = RequestMethod.HEAD)
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
     public ResponseEntity<?> getSecureFileHead(@PathVariable String id, 
                                              @RequestParam(required = false, defaultValue = "false") boolean preview) {
         try {
@@ -107,11 +98,6 @@ public class SecureStorageController {
             String contentType = (String) metadata.get("contentType");
             
             HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-            headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-            headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
-            headers.add("Access-Control-Max-Age", "3600");
             
             // Set content type
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
@@ -148,7 +134,6 @@ public class SecureStorageController {
      * Delete a securely stored file
      */
     @DeleteMapping("/delete/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<Void> deleteSecureFile(@PathVariable String id) {
         secureStorageService.deleteSecureFile(id);
         return ResponseEntity.ok().build();
@@ -158,7 +143,6 @@ public class SecureStorageController {
      * Verify file integrity
      */
     @GetMapping("/verify/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<String> verifyFileIntegrity(@PathVariable String id) {
         // The secure storage service would have proper methods for this
         // For now, just assume verification is successful
@@ -169,39 +153,21 @@ public class SecureStorageController {
      * Get file metadata
      */
     @GetMapping("/{id}/metadata")
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Type"})
     public ResponseEntity<?> getSecureFileMetadata(@PathVariable String id) {
         try {
             // Get file metadata
             Map<String, Object> metadata = secureStorageService.getFileMetadata(id);
             
-            // Add CORS headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
-            headers.add("Access-Control-Allow-Headers", "*");
-            headers.add("Access-Control-Max-Age", "3600");
-            headers.add("Cache-Control", "no-cache, no-store, must-revalidate");
-            
             // Return the metadata
-            return ResponseEntity.ok()
-                .headers(headers)
-                .body(metadata);
+            return ResponseEntity.ok(metadata);
                 
         } catch (Exception e) {
             e.printStackTrace();
-            
-            // Return error response with CORS headers
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
-            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
-            headers.add("Access-Control-Allow-Headers", "*");
             
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to get file metadata: " + e.getMessage());
             
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .headers(headers)
                 .body(error);
         }
     }
