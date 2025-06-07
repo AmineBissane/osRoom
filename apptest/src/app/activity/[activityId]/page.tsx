@@ -999,69 +999,34 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // Create preview URL with direct access
-          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&direct=true`;
+          // Create preview URL
+          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
           setPreviewUrl(previewUrl);
           
           // Get file metadata to determine type
-          try {
-            const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
-            if (metadataResponse.ok) {
-              const metadata = await metadataResponse.json();
-              setFileType(metadata.contentType);
-              
-              // If it's a text file, fetch the content
-              if (metadata.contentType?.startsWith('text/') || 
-                  metadata.contentType === 'application/json' ||
-                  metadata.contentType === 'application/javascript' ||
-                  metadata.contentType === 'application/xml' ||
-                  metadata.contentType === 'application/x-yaml') {
-                const textResponse = await fetch(previewUrl);
-                if (textResponse.ok) {
-                  const text = await textResponse.text();
-                  setTextContent(text);
-                }
-              }
-            } else {
-              // If metadata fails, try to detect type from preview response
-              const previewResponse = await fetch(previewUrl, { method: 'HEAD' });
-              const contentType = previewResponse.headers.get('content-type');
-              if (contentType) {
-                setFileType(contentType);
-                
-                // If it's a text file, fetch the content
-                if (contentType.startsWith('text/') || 
-                    contentType === 'application/json' ||
-                    contentType === 'application/javascript' ||
-                    contentType === 'application/xml' ||
-                    contentType === 'application/x-yaml') {
-                  const textResponse = await fetch(previewUrl);
-                  if (textResponse.ok) {
-                    const text = await textResponse.text();
-                    setTextContent(text);
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('Could not determine file type:', err);
-            // Try to load as text by default
-            try {
+          const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            setFileType(metadata.contentType);
+            
+            // If it's a text file, fetch the content
+            if (metadata.contentType?.startsWith('text/') || 
+                metadata.contentType === 'application/json' ||
+                metadata.contentType === 'application/javascript' ||
+                metadata.contentType === 'application/xml' ||
+                metadata.contentType === 'application/x-yaml') {
               const textResponse = await fetch(previewUrl);
               if (textResponse.ok) {
                 const text = await textResponse.text();
                 setTextContent(text);
-                setFileType('text/plain');
               }
-            } catch (textErr) {
-              console.error('Failed to load as text:', textErr);
             }
           }
           
+          setLoading(false);
         } catch (err) {
           console.error('Error loading preview:', err);
           setError('No se pudo cargar la vista previa');
-        } finally {
           setLoading(false);
         }
       };
