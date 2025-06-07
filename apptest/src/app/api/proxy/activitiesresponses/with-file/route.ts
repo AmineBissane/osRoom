@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     
     // Make the request to the gateway
-    const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/with-file`;
+    const apiUrl = `http://82.29.168.17:8020/api/v1/activitiesresponses/with-file`;
     console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
