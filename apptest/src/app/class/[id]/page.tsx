@@ -527,268 +527,122 @@ export default function ClassPage({ params }: { params: { id: string } }) {
   
   // DocumentPreview component moved here
   const DocumentPreview = ({ fileId }: { fileId: string }) => {
-    const [isLoading, setIsLoading] = useState(true);
+    const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [retryCount, setRetryCount] = useState(0);
-    const [isNonViewableFile, setIsNonViewableFile] = useState(false);
-    const [fileName, setFileName] = useState<string>("");
-    const [fileType, setFileType] = useState<string>("archivo");
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [fileType, setFileType] = useState<string | null>(null);
+    const [textContent, setTextContent] = useState<string | null>(null);
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
     
-    // Lista de extensiones de archivo que no se pueden visualizar
-    const nonViewableExtensions = useMemo(() => [
-      '.zip', '.rar', '.7z', '.tar', '.gz', '.exe', '.msi', 
-      '.jar', '.war', '.ear', '.bin', '.iso', '.dmg', '.pkg',
-      '.apk', '.app', '.bat', '.cmd', '.sh'
-    ], []);
-    
-    // Función para comprobar si un archivo es no visualizable por su extensión
-    const isNonViewableExtension = useCallback((filename: string) => {
-      const lowerFilename = filename.toLowerCase();
-      return nonViewableExtensions.some(ext => lowerFilename.endsWith(ext));
-    }, [nonViewableExtensions]);
-    
-    // Función para obtener el tipo de archivo a partir de su nombre
-    const getFileTypeFromName = useCallback((filename: string) => {
-      const lowerFilename = filename.toLowerCase();
-      
-      if (lowerFilename.endsWith('.zip')) return "ZIP";
-      if (lowerFilename.endsWith('.rar')) return "RAR";
-      if (lowerFilename.endsWith('.7z')) return "7-Zip";
-      if (lowerFilename.endsWith('.tar') || lowerFilename.endsWith('.gz')) return "TAR";
-      if (lowerFilename.endsWith('.exe') || lowerFilename.endsWith('.msi')) return "ejecutable";
-      if (lowerFilename.endsWith('.jar') || lowerFilename.endsWith('.war')) return "Java";
-      
-      // Extraer la extensión del archivo
-      const extension = lowerFilename.split('.').pop();
-      return extension ? extension.toUpperCase() : "archivo";
-    }, []);
-    
-    // Check if the file is viewable or not
     useEffect(() => {
-      if (!fileId) return;
-      
-      // Primero, verificar si el fileId ya contiene información sobre el tipo de archivo
-      if (typeof fileId === 'string') {
-        const lowerFileId = fileId.toLowerCase();
-        
-        // Intentar extraer el nombre del archivo del fileId
-        const possibleFileName = fileId.split('/').pop() || fileId;
-        
-        // Si el fileId contiene una extensión no visualizable
-        if (isNonViewableExtension(possibleFileName)) {
-          console.log(`Detectado archivo no visualizable por fileId: ${possibleFileName}`);
-          setFileName(possibleFileName);
-          setFileType(getFileTypeFromName(possibleFileName));
-          setIsNonViewableFile(true);
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      // Si no se detecta por fileId, intentar obtener metadatos
-      const fetchFileInfo = async () => {
+      const loadPreview = async () => {
         try {
-          setIsLoading(true);
-          setError(null);
-          
-          // First, try to get metadata about the file
-          const metadataResponse = await fetch(`/api/proxy/file-storage/${fileId}/metadata`, {
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (!metadataResponse.ok) {
-            throw new Error(`Failed to fetch file metadata: ${metadataResponse.status}`);
+          setLoading(true);
+          if (!fileId) {
+            throw new Error('No file ID provided');
           }
           
-          const metadata = await metadataResponse.json();
-          console.log('File metadata:', metadata);
+          // Use our proxy to avoid CORS issues
+          const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
           
-          // Set file name and type from metadata
-          if (metadata.name) {
-            setFileName(metadata.name);
-            
-            // Detect file type from extension
-            const extension = metadata.name.toLowerCase().split('.').pop();
-            if (extension) {
-              if (['pdf'].includes(extension)) {
-                setFileType('PDF');
-              } else if (['doc', 'docx'].includes(extension)) {
-                setFileType('Word');
-              } else if (['xls', 'xlsx'].includes(extension)) {
-                setFileType('Excel');
-              } else if (['ppt', 'pptx'].includes(extension)) {
-                setFileType('PowerPoint');
-              } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
-                setFileType('imagen');
-              } else if (['txt', 'md'].includes(extension)) {
-                setFileType('texto');
-              } else {
-                setFileType(`archivo ${extension}`);
-              }
-              
-              // Check if this is a non-viewable file type
-              if (nonViewableExtensions.some(ext => metadata.name.toLowerCase().endsWith(ext))) {
-                setIsNonViewableFile(true);
-                setIsLoading(false);
-                return;
-              }
-            }
+          // Make the request through our proxy
+          const response = await fetch(proxyUrl);
+          
+          if (!response.ok) {
+            throw new Error(`Proxy returned status: ${response.status}`);
           }
           
-          // Now check if we can preview the file
-          const headResponse = await fetch(`/api/proxy/file-storage/${fileId}?preview=true`, {
-            method: 'HEAD'
-          });
+          // Get the content type
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          setFileType(contentType);
           
-          if (!headResponse.ok) {
-            throw new Error(`File preview not available: ${headResponse.status}`);
+          // Handle different file types
+          if (contentType.startsWith('text/') || 
+              contentType === 'application/json' ||
+              contentType === 'application/javascript' ||
+              contentType === 'application/xml' ||
+              contentType === 'application/x-yaml') {
+            // For text files, get the text content
+            const text = await response.text();
+            setTextContent(text);
+          } else {
+            // For binary files, create a blob URL
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            setBlobUrl(url);
           }
           
-          // If we got here, file should be viewable
-          setIsLoading(false);
-          
-        } catch (error) {
-          console.error('Error fetching file info:', error);
-          setError(error instanceof Error ? error.message : 'Error loading file preview');
-          setIsLoading(false);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error loading preview:', err);
+          setError(`No se pudo cargar la vista previa: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+          setLoading(false);
         }
       };
       
-      fetchFileInfo();
-    }, [fileId, isNonViewableExtension, getFileTypeFromName, fileName]);
-    
-    // Efecto para controlar cargas y timeouts
-    useEffect(() => {
-      // Skip timeout for non-viewable files
-      if (isNonViewableFile) {
-        setIsLoading(false);
-        return;
+      if (fileId) {
+        loadPreview();
+      } else {
+        setError('No se proporcionó un ID de archivo');
+        setLoading(false);
       }
       
-      // Timeout de seguridad (20 segundos)
-      const timeout = setTimeout(() => {
-        if (isLoading) {
-          console.log("Timeout de carga de documento alcanzado");
-          setError("El documento no pudo cargarse. Intente descargarlo.");
-          setIsLoading(false);
+      // Clean up blob URLs on unmount
+      return () => {
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
         }
-      }, 20000);
-      
-      return () => clearTimeout(timeout);
-    }, [isLoading, isNonViewableFile]);
+      };
+    }, [fileId, blobUrl]);
     
-    // Efecto para descargar automáticamente archivos no visualizables
-    // Este efecto debe estar fuera de condiciones para mantener el orden de los hooks
-    useEffect(() => {
-      if (isNonViewableFile && fileId) {
-        console.log('Iniciando descarga automática del archivo no visualizable');
-        const timer = setTimeout(() => {
-          downloadFile(fileId);
-        }, 1000); // Retraso para evitar problemas con múltiples descargas
-        
-        return () => clearTimeout(timer);
+    const renderContent = () => {
+      if (loading) {
+        return <div className="flex justify-center items-center p-8"><div className="loader"></div></div>;
       }
-    }, [isNonViewableFile, fileId]);
+      
+      if (error) {
+        return <div className="text-red-500 p-4">{error}</div>;
+      }
+      
+      // For text content, render it directly
+      if (textContent) {
+        return (
+          <div className="p-4 overflow-auto max-h-[600px] whitespace-pre-wrap font-mono text-sm bg-gray-50 border rounded">
+            {textContent}
+          </div>
+        );
+      }
+      
+      // For binary files (images, PDFs, etc.)
+      if (blobUrl) {
+        if (fileType?.startsWith('image/')) {
+          return <img src={blobUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+        } else {
+          return (
+            <iframe 
+              src={blobUrl} 
+              className="w-full h-[600px] border-0" 
+              title="File preview"
+            />
+          );
+        }
+      }
+      
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+    };
     
-    // Vista para archivos no visualizables (ZIP, executable, etc.)
-    if (isNonViewableFile) {
-      return (
-        <div className="flex flex-col space-y-4">
-          <div className="flex justify-center">
-            <Button 
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => downloadFile(fileId)}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Descargar archivo {fileType}
-            </Button>
-          </div>
-          
-          <div className="w-full border rounded-md p-6 bg-gray-50 flex flex-col items-center justify-center">
-            <div className="bg-blue-50 rounded-full p-4 mb-4">
-              <FileText className="h-12 w-12 text-blue-500" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">{fileName || `Archivo ${fileType}`}</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Los archivos {fileType} no se pueden previsualizar. Haga clic en el botón de descarga para obtener el archivo.
-            </p>
-          </div>
-        </div>
-      );
-    }
-    
-    // Si hay error, mostrar mensaje y botón de descarga
-    if (error) {
-      return (
-        <div className="flex flex-col space-y-4">
-          <div className="flex justify-center">
-            <Button 
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => downloadFile(fileId)}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Descargar archivo
-            </Button>
-          </div>
-          
-          <div className="w-full h-96 border rounded flex items-center justify-center bg-gray-50">
-            <div className="text-center p-4">
-              <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-2" />
-              <p className="text-muted-foreground mb-2">{error}</p>
-              <Button 
-                variant="secondary"
-                onClick={() => {
-                  setError(null);
-                  setIsLoading(true);
-                  setRetryCount(c => c + 1);
-                }}
-                size="sm"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reintentar
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    
-    // iframe para vista previa
     return (
       <div className="w-full">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-        
-        <div className="flex justify-end mb-2 space-x-2">
+        {renderContent()}
+        <div className="mt-4 flex justify-end">
           <Button 
             variant="outline" 
-            size="sm" 
+            size="sm"
             onClick={() => downloadFile(fileId)}
           >
             <Download className="h-4 w-4 mr-2" />
-            Descargar
+            Descargar archivo
           </Button>
         </div>
-        
-        <iframe
-          ref={iframeRef}
-          key={`${fileId}-${retryCount}`}
-          src={`http://82.29.168.17:8222/api/v1/file-storage/${fileId}?preview=true`}
-          className="w-full h-[600px] border rounded"
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setError("No se pudo cargar el documento");
-            setIsLoading(false);
-          }}
-        />
       </div>
     );
   };
