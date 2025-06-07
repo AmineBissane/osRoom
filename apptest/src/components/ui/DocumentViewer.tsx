@@ -148,7 +148,7 @@ export function DocumentViewer({
         console.log('Document ready for display:', proxyUrl)
       } catch (err) {
         console.error('Error loading document:', err)
-        setError('Connection error. Please download the file or try again later.')
+        setError('Error de conexión. Por favor descargue el archivo o intente más tarde.')
       } finally {
         // The iframe onLoad will set loading to false when content is ready
       }
@@ -186,7 +186,8 @@ export function DocumentViewer({
           }
         }
         
-        setError('Connection error. Please download the file or try again later.')
+        // Just show the connection error without mentioning timeout
+        setError('Error de conexión. Por favor descargue el archivo o intente más tarde.')
         setLoading(false)
       }
     }, 10000) // Reduced to 10 second timeout for faster error feedback
@@ -204,7 +205,7 @@ export function DocumentViewer({
             onClick={handleOpenInNewTab}
           >
             <ExternalLink className="h-4 w-4 mr-2" />
-            Open in New Tab
+            Abrir en nueva pestaña
           </Button>
           
           <Button 
@@ -213,7 +214,7 @@ export function DocumentViewer({
             onClick={handleDownload}
           >
             <Download className="h-4 w-4 mr-2" />
-            Download
+            Descargar
           </Button>
           
           <Button
@@ -222,7 +223,7 @@ export function DocumentViewer({
             onClick={handleRetry}
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
+            Reintentar
           </Button>
         </div>
       )}
@@ -232,7 +233,7 @@ export function DocumentViewer({
         {loading && (
           <div className="flex flex-col items-center justify-center h-full w-full p-4" style={{height}}>
             <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary" />
-            <p className="text-center text-muted-foreground">Loading document...</p>
+            <p className="text-center text-muted-foreground">Cargando documento...</p>
           </div>
         )}
         
@@ -245,11 +246,11 @@ export function DocumentViewer({
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRetry}>
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
+                Reintentar
               </Button>
               <Button variant="default" size="sm" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
-                Download
+                Descargar
               </Button>
             </div>
           </div>

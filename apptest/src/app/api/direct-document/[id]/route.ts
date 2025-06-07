@@ -47,14 +47,14 @@ function extractToken(request: NextRequest): string | null {
 /**
  * Utility function to make fetch requests with retry logic
  */
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       // If not the first attempt, wait a bit before retrying
       if (attempt > 0) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        await new Promise(resolve => setTimeout(resolve, 300)); // Reduced wait time
         console.log(`Retry attempt ${attempt} for ${url}`);
       }
       
@@ -270,7 +270,7 @@ export async function GET(
       try {
         console.log(`Attempting document fetch from: ${url}`);
         
-        // Configure request options
+        // Configure request options with longer timeout
         const options: RequestInit = {
           method: 'GET',
           headers: {
@@ -279,12 +279,12 @@ export async function GET(
             'Cache-Control': 'no-cache, no-store, must-revalidate',
           },
           cache: 'no-store',
-          // Use a reasonable timeout
-          signal: AbortSignal.timeout(10000)
+          // Use a longer timeout for document fetching
+          signal: AbortSignal.timeout(30000) // 30 seconds
         };
         
         // Use our retry logic
-        response = await fetchWithRetry(url, options);
+        response = await fetchWithRetry(url, options, 3); // Increase max retries to 3
         
         if (response.ok) {
           console.log(`Successful response from: ${url}`);
@@ -302,7 +302,7 @@ export async function GET(
     if (!response || !response.ok) {
       console.error('All document fetch attempts failed');
       return NextResponse.json(
-        { error: 'Failed to retrieve document from all sources', details: lastError instanceof Error ? lastError.message : String(lastError) },
+        { error: 'Failed to retrieve document from all sources' },
         { status: 502 }
       );
     }
@@ -360,7 +360,7 @@ export async function GET(
     }
     
     return NextResponse.json(
-      { error: 'Failed to retrieve document', details: error instanceof Error ? error.message : String(error) },
+      { error: 'Failed to retrieve document' },
       { status: 500 }
     );
   }
