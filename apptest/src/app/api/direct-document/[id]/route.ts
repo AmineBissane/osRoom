@@ -20,6 +20,76 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 /**
+ * Utility function to extract JWT token from request
+ */
+function extractToken(request: NextRequest): string | null {
+  // Try to get from Authorization header first
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  
+  // Try to get from cookies
+  const cookieHeader = request.headers.get('cookie');
+  if (cookieHeader) {
+    const accessTokenCookie = cookieHeader
+      .split('; ')
+      .find(row => row.startsWith('access_token='));
+    
+    if (accessTokenCookie) {
+      return accessTokenCookie.split('=')[1];
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Utility function to make fetch requests with retry logic
+ */
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // If not the first attempt, wait a bit before retrying
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        console.log(`Retry attempt ${attempt} for ${url}`);
+      }
+      
+      const response = await fetch(url, options);
+      
+      // If the response is successful, return it
+      if (response.ok) {
+        return response;
+      }
+      
+      // If we get a server error, we might want to retry
+      if (response.status >= 500 && attempt < maxRetries) {
+        console.log(`Server error ${response.status}, will retry...`);
+        continue;
+      }
+      
+      // For other error codes, just return the response as is
+      return response;
+      
+    } catch (error) {
+      console.error(`Fetch attempt ${attempt + 1} failed:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // If it's the last attempt, rethrow the error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+    }
+  }
+  
+  // This shouldn't be reached, but TypeScript requires a return
+  throw lastError || new Error('Unknown error in fetchWithRetry');
+}
+
+/**
  * Handle HEAD requests to check document availability
  * Browsers often make HEAD requests before GET to check content type and availability
  */
@@ -40,55 +110,61 @@ export async function HEAD(
   const searchParams = request.nextUrl.searchParams;
   const isPreview = searchParams.get('preview') !== 'false';
   
-  // Extract JWT token from cookies or Authorization header
-  let token = null;
-  
-  // Try to get from Authorization header first
-  const authHeader = request.headers.get('authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else {
-    // Try to get from cookies
-    const cookieHeader = request.headers.get('cookie');
-    if (cookieHeader) {
-      const accessTokenCookie = cookieHeader
-        .split('; ')
-        .find(row => row.startsWith('access_token='));
-      
-      if (accessTokenCookie) {
-        token = accessTokenCookie.split('=')[1];
-      }
-    }
-  }
+  // Extract JWT token
+  const token = extractToken(request);
   
   if (!token) {
     return new NextResponse(null, { status: 401 });
   }
   
   try {
-    // Construct the target URL
-    const targetUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+    // Try both direct and fallback URLs
+    const urls = [
+      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
+      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
+    ];
     
-    // Create a fetch request with a short timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // shorter timeout for HEAD
+    let response = null;
+    let lastError = null;
     
-    // Make a HEAD request to the document service
-    const response = await fetch(targetUrl, {
-      method: 'HEAD',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': '*/*',
-      },
-      signal: controller.signal
-    });
+    // Try each URL in order
+    for (const url of urls) {
+      try {
+        console.log(`Trying HEAD request to: ${url}`);
+        
+        // Create a fetch request with a short timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // shorter timeout for HEAD
+        
+        // Make a HEAD request to the document service
+        response = await fetch(url, {
+          method: 'HEAD',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': '*/*',
+          },
+          signal: controller.signal
+        });
+        
+        // Clear the timeout
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          console.log(`Successful HEAD response from: ${url}`);
+          break;
+        } else {
+          console.log(`Failed HEAD response from: ${url}, status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log(`Error with HEAD request to ${url}:`, error);
+        lastError = error;
+      }
+    }
     
-    // Clear the timeout
-    clearTimeout(timeoutId);
-    
-    // Handle errors
-    if (!response.ok) {
-      return new NextResponse(null, { status: response.status });
+    // If all URLs failed, return the last error
+    if (!response || !response.ok) {
+      console.error('All HEAD requests failed');
+      return new NextResponse(null, { status: 502 });
     }
     
     // Get content type and other headers
@@ -162,32 +238,13 @@ export async function GET(
 
   // Log request details
   console.log(`Direct document request for: ${fileId}`);
-  console.log('Request headers:', Object.fromEntries(request.headers.entries()));
   
   // Check if this is a preview or download
   const searchParams = request.nextUrl.searchParams;
   const isPreview = searchParams.get('preview') !== 'false';
   
-  // Extract JWT token from cookies or Authorization header
-  let token = null;
-  
-  // Try to get from Authorization header first
-  const authHeader = request.headers.get('authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7);
-  } else {
-    // Try to get from cookies
-    const cookieHeader = request.headers.get('cookie');
-    if (cookieHeader) {
-      const accessTokenCookie = cookieHeader
-        .split('; ')
-        .find(row => row.startsWith('access_token='));
-      
-      if (accessTokenCookie) {
-        token = accessTokenCookie.split('=')[1];
-      }
-    }
-  }
+  // Extract JWT token
+  const token = extractToken(request);
   
   if (!token) {
     return NextResponse.json(
@@ -197,36 +254,56 @@ export async function GET(
   }
   
   try {
-    // Construct the target URL - use the gateway
-    const targetUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+    // Try both direct URLs
+    const urls = [
+      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
+      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
+    ];
     
-    console.log(`Fetching document from: ${targetUrl}`);
+    console.log(`Will try these URLs in order:`, urls);
     
-    // Create a fetch request with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    let response = null;
+    let lastError = null;
     
-    // Make the request to the document service
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': '*/*',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-      cache: 'no-store',
-      signal: controller.signal
-    });
+    // Try each URL with retry logic
+    for (const url of urls) {
+      try {
+        console.log(`Attempting document fetch from: ${url}`);
+        
+        // Configure request options
+        const options: RequestInit = {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          },
+          cache: 'no-store',
+          // Use a reasonable timeout
+          signal: AbortSignal.timeout(10000)
+        };
+        
+        // Use our retry logic
+        response = await fetchWithRetry(url, options);
+        
+        if (response.ok) {
+          console.log(`Successful response from: ${url}`);
+          break;
+        } else {
+          console.log(`Failed response from: ${url}, status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log(`Error with request to ${url}:`, error);
+        lastError = error;
+      }
+    }
     
-    // Clear the timeout
-    clearTimeout(timeoutId);
-    
-    // Handle errors
-    if (!response.ok) {
-      console.error(`Document service returned status: ${response.status}`);
+    // If all URLs failed, return an error
+    if (!response || !response.ok) {
+      console.error('All document fetch attempts failed');
       return NextResponse.json(
-        { error: `Document service returned status: ${response.status}` },
-        { status: response.status }
+        { error: 'Failed to retrieve document from all sources', details: lastError instanceof Error ? lastError.message : String(lastError) },
+        { status: 502 }
       );
     }
     

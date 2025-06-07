@@ -66,8 +66,12 @@ export function DocumentViewer({
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store'
-        }
+          'Cache-Control': 'no-cache, no-store',
+          'Accept': '*/*'
+        },
+        cache: 'no-store',
+        mode: 'cors',
+        credentials: 'same-origin'
       })
       
       if (!response.ok) {
@@ -133,16 +137,18 @@ export function DocumentViewer({
         
         // Use our proxy URL to avoid CORS issues
         const proxyUrl = getProxyUrl(true)
-        setDocUrl(proxyUrl)
         
         // Force a GET request to the server to ensure content is loaded
         await forceGetRequest(proxyUrl)
+        
+        // Set the URL after confirming the resource is available
+        setDocUrl(proxyUrl)
         
         // We'll let the iframe handle the actual display
         console.log('Document ready for display:', proxyUrl)
       } catch (err) {
         console.error('Error loading document:', err)
-        setError('Failed to load document. Please try downloading instead.')
+        setError('Connection error. Please download the file or try again later.')
       } finally {
         // The iframe onLoad will set loading to false when content is ready
       }
@@ -180,10 +186,10 @@ export function DocumentViewer({
           }
         }
         
-        setError('Document load timed out. Please try downloading instead.')
+        setError('Connection error. Please download the file or try again later.')
         setLoading(false)
       }
-    }, 15000) // 15 second timeout
+    }, 10000) // Reduced to 10 second timeout for faster error feedback
     
     return () => clearTimeout(timeout)
   }, [loading])
@@ -221,10 +227,10 @@ export function DocumentViewer({
         </div>
       )}
       
-      <CardContent className="p-0" style={{ height, width }}>
+      <CardContent className="p-0 h-full">
         {/* Loading state */}
         {loading && (
-          <div className="flex flex-col items-center justify-center h-full w-full p-4">
+          <div className="flex flex-col items-center justify-center h-full w-full p-4" style={{height}}>
             <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary" />
             <p className="text-center text-muted-foreground">Loading document...</p>
           </div>
@@ -232,9 +238,9 @@ export function DocumentViewer({
         
         {/* Error state */}
         {error && (
-          <div className="flex flex-col items-center justify-center h-full w-full p-4">
+          <div className="flex flex-col items-center justify-center h-full w-full p-4" style={{height}}>
             <AlertCircle className="h-10 w-10 mb-4 text-destructive" />
-            <p className="text-center font-medium mb-2 text-destructive">Failed to load document</p>
+            <p className="text-center font-medium mb-2 text-destructive">Error al cargar el documento</p>
             <p className="text-center text-muted-foreground mb-4">{error}</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRetry}>
@@ -250,47 +256,50 @@ export function DocumentViewer({
         )}
         
         {/* Document viewer */}
-        {!error && (
-          <div 
-            className={`h-full w-full transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}
-          >
-            {/* Hidden link to ensure GET request is made */}
-            <div style={{ display: 'none' }}>
-              <a 
-                href={docUrl} 
-                target="_blank" 
-                ref={(el) => {
-                  if (el && retryCount > 0) {
-                    console.log('Auto-clicking link to force GET request')
-                    el.click()
-                    // Stop it from actually opening
-                    setTimeout(() => {
-                      try { window.stop() } catch (e) {}
-                    }, 100)
-                  }
-                }}
-              >
-                Force GET
-              </a>
-            </div>
-            
+        <div 
+          className={`h-full w-full transition-opacity duration-300 ${loading || error ? 'opacity-0 hidden' : 'opacity-100'}`}
+          style={{height}}
+        >
+          {/* Hidden link to ensure GET request is made */}
+          <div style={{ display: 'none' }}>
+            <a 
+              href={docUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              ref={(el) => {
+                if (el && retryCount > 0) {
+                  console.log('Auto-clicking link to force GET request')
+                  el.click()
+                  // Stop it from actually opening
+                  setTimeout(() => {
+                    try { window.stop() } catch (e) {}
+                  }, 100)
+                }
+              }}
+            >
+              Force GET
+            </a>
+          </div>
+          
+          {docUrl && (
             <iframe
               ref={iframeRef}
               key={`doc-viewer-${fileId}-${retryCount}`}
               src={docUrl}
               className="w-full h-full border-0"
+              style={{width, height}}
               onLoad={() => {
                 console.log('Document iframe loaded')
                 setLoading(false)
               }}
               onError={(e) => {
                 console.error('Document iframe error:', e)
-                setError('Could not display document. Please download instead.')
+                setError('Error de conexión. Por favor descargue el archivo o intente más tarde.')
                 setLoading(false)
               }}
             />
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   )
