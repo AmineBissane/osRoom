@@ -1102,21 +1102,13 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
     
-    // Get the access token from cookies
-    const getToken = () => {
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('access_token='));
-      return tokenCookie ? tokenCookie.split('=')[1] : null;
-    };
+    if (!fileId) {
+      return <div className="text-gray-500 p-4">No hay archivo disponible</div>;
+    }
     
-    // Direct API URL with token in the URL to bypass CORS
-    const getDirectUrl = () => {
-      if (!fileId) return '';
-      const token = getToken();
-      return `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true&token=${token}`;
-    };
+    // Direct URL to the file without any token or authentication
+    const directUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
     
     // Handle iframe load event
     const handleIframeLoad = () => {
@@ -1129,64 +1121,6 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       setLoading(false);
     };
     
-    // Add CORS handling script
-    useEffect(() => {
-      // Only run in browser
-      if (typeof window === 'undefined') return;
-      
-      try {
-        // Create a script element to disable CORS in the iframe
-        const script = document.createElement('script');
-        script.innerHTML = `
-          // Override fetch to add credentials
-          const originalFetch = window.fetch;
-          window.fetch = function(url, options = {}) {
-            options.credentials = 'include';
-            options.mode = 'cors';
-            return originalFetch(url, options);
-          };
-        `;
-        
-        // Add the script to the head
-        document.head.appendChild(script);
-        
-        return () => {
-          // Clean up
-          if (script.parentNode) {
-            script.parentNode.removeChild(script);
-          }
-        };
-      } catch (err) {
-        console.error('Error setting up CORS handling:', err);
-      }
-    }, []);
-    
-    // Set a timeout to handle cases where the iframe doesn't load
-    useEffect(() => {
-      if (!fileId) {
-        setError('No se proporcionó un ID de archivo');
-        setLoading(false);
-        return;
-      }
-      
-      const timeout = setTimeout(() => {
-        if (loading) {
-          setError('Tiempo de espera agotado al cargar el archivo');
-          setLoading(false);
-        }
-      }, 15000);
-      
-      return () => {
-        clearTimeout(timeout);
-      };
-    }, [fileId, loading]);
-    
-    if (!fileId) {
-      return <div className="text-gray-500 p-4">No hay archivo disponible</div>;
-    }
-    
-    const directUrl = getDirectUrl();
-    
     return (
       <div className="w-full">
         {loading && (
@@ -1196,7 +1130,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         )}
         {error && <div className="text-red-500 p-4">{error}</div>}
         
-        {/* Direct iframe to API */}
+        {/* Direct iframe to API - no CORS, no token, just direct access */}
         <iframe 
           src={directUrl}
           className="w-full h-[600px] border-0" 
@@ -1207,7 +1141,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         />
         
         {/* Add a direct link as fallback */}
-        {error && fileId && (
+        {error && (
           <div className="mt-4 text-center">
             <a 
               href={directUrl}
