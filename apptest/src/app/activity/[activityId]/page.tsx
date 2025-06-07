@@ -1021,6 +1021,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     // Import and use our simplified DocumentViewer
     const { DocumentViewer } = require('@/components/ui/DocumentViewer');
     
+    // Create the external URL for direct file access
+    const externalUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+    
+    // Create a proxy URL as fallback to handle CORS issues
+    const proxyUrl = `/api/direct-external-document/${fileId}?preview=true`;
+    
     return (
       <div className="mt-4">
         <DocumentViewer
@@ -1028,6 +1034,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           className=""
           hideControls={hideButtons}
           height="500px"
+          externalUrl={externalUrl}
+          proxyUrl={proxyUrl}
         />
       </div>
     );
@@ -1043,7 +1051,26 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
     }
     
-    return <DocumentPreview fileId={fileId} hideButtons={false} />;
+    // Create the external URL for direct file access
+    const externalUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true`;
+    
+    // Create a proxy URL as fallback to handle CORS issues
+    const proxyUrl = `/api/direct-external-document/${fileId}?preview=true`;
+    
+    // Import the DocumentViewer component
+    const { DocumentViewer } = require('@/components/ui/DocumentViewer');
+    
+    return (
+      <div className="mt-4">
+        <DocumentViewer
+          fileId={fileId}
+          externalUrl={externalUrl}
+          proxyUrl={proxyUrl}
+          height="500px"
+          hideControls={false}
+        />
+      </div>
+    );
   });
 
   DirectDocumentPreview.displayName = 'DirectDocumentPreview';
