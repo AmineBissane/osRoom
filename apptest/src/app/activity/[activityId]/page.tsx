@@ -996,8 +996,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   // Function to get a file URL for download or preview
   const getFileUrl = (fileId: string | undefined, preview: boolean = false): string => {
     if (!fileId) return '';
-    // Use relative path to ensure secure connection
-    return `/api/proxy/file-storage/download/${fileId}?preview=${preview}`;
+    
+    // Use our direct-document API route which handles CORS and authentication
+    return `/api/direct-document/${fileId}?preview=${preview}`;
+    
+    // Old method kept as fallback in code comments
+    // return `/api/proxy/file-storage/download/${fileId}?preview=${preview}`;
   };
 
   // DocumentPreview component optimizado con memo para evitar re-renderizados
@@ -1134,13 +1138,17 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           
           console.log(`Intentando obtener metadatos para el archivo: ${fileId}`);
           
-          // First, try to get metadata using our proxy endpoint instead of direct localhost
+          // First, try to get metadata using our improved approach
           try {
-            const metadataResponse = await fetch(`/api/proxy/file-storage/${fileId}/metadata`, {
+            // Try direct document metadata first
+            const directDocUrl = `/api/direct-document/${fileId}/metadata`;
+            const metadataResponse = await fetch(directDocUrl, {
               headers: {
                 'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json'
-              }
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache, no-store'
+              },
+              cache: 'no-store'
             });
             
             if (metadataResponse.ok) {
@@ -1156,7 +1164,34 @@ export default function ActivityPage({ params }: { params: { activityId: string 
                 }
               }
             } else {
-              console.warn(`No se pudieron obtener metadatos. Estado: ${metadataResponse.status}`);
+              // Fallback to proxy endpoint
+              const proxyUrl = `/api/proxy/file-storage/${fileId}/metadata`;
+              console.log(`Intentando obtener metadatos desde: ${proxyUrl}`);
+              
+              const fallbackResponse = await fetch(proxyUrl, {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Accept': 'application/json',
+                  'Cache-Control': 'no-cache, no-store'
+                },
+                cache: 'no-store'
+              });
+              
+              if (fallbackResponse.ok) {
+                const metadata = await fallbackResponse.json();
+                console.log('Metadatos obtenidos del fallback:', metadata);
+                
+                if (metadata && metadata.fileName) {
+                  setFileName(metadata.fileName);
+                  
+                  if (isNonViewableExtension(metadata.fileName)) {
+                    setAsNonViewable(metadata.fileName);
+                    return;
+                  }
+                }
+              } else {
+                console.warn(`No se pudieron obtener metadatos. Estado: ${fallbackResponse.status}`);
+              }
             }
           } catch (metadataError) {
             console.error('Error al obtener metadatos:', metadataError);
@@ -1171,17 +1206,39 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             const headTimeoutId = setTimeout(() => headController.abort(), 5000);
             
             try {
-              const headResponse = await fetch(getFileUrl(fileId, true), {
-                method: 'HEAD',
-                headers: {
-                  'Authorization': `Bearer ${token}`
-                },
-                signal: headController.signal
-              });
+              // Try localhost URL first, then fallback to public IP
+              const fileUrls = [
+                `/api/direct-document/${fileId}?preview=true`,
+                getFileUrl(fileId, true)
+              ];
+              
+              let headResponse = null;
+              
+              for (const url of fileUrls) {
+                try {
+                  console.log(`Intentando HEAD request a: ${url}`);
+                  headResponse = await fetch(url, {
+                    method: 'HEAD',
+                    headers: {
+                      'Authorization': `Bearer ${token}`
+                    },
+                    signal: headController.signal
+                  });
+                  
+                  if (headResponse.ok) {
+                    console.log(`HEAD request exitoso a: ${url}`);
+                    break;
+                  } else {
+                    console.log(`HEAD request fallido a: ${url}, código: ${headResponse.status}`);
+                  }
+                } catch (urlError) {
+                  console.log(`Error con HEAD request a ${url}:`, urlError);
+                }
+              }
               
               clearTimeout(headTimeoutId);
               
-              if (headResponse.ok) {
+              if (headResponse && headResponse.ok) {
                 const contentType = headResponse.headers.get('content-type');
                 const contentDisposition = headResponse.headers.get('content-disposition');
                 
@@ -1226,7 +1283,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
                   }
                 }
               } else {
-                console.warn(`HEAD request failed with status: ${headResponse.status}`);
+                console.warn(`Todos los HEAD request fallaron`);
               }
             } catch (headAbortError: any) {
               if (headAbortError.name === 'AbortError') {
@@ -1342,9 +1399,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         const timeoutId = setTimeout(() => {
           console.log('Iframe loading timeout reached');
           setIsLoading(false);
-          setError('El tiempo de carga ha expirado. Intente usar los botones para abrir o descargar el documento.');
-          // Don't switch to buttons mode automatically to give the iframe a chance
-          // if it's still loading but taking time
+          setError('Error de conexión. Por favor descargue el archivo o intente más tarde.');
         }, 8000); // 8 seconds timeout
         
         return () => {

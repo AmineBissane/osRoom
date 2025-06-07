@@ -118,10 +118,10 @@ export async function HEAD(
   }
   
   try {
-    // Try both direct and fallback URLs
+    // Try both direct and fallback URLs - prioritize localhost
     const urls = [
-      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
-      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
+      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
+      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
     ];
     
     let response = null;
@@ -221,21 +221,129 @@ export async function HEAD(
 }
 
 /**
- * Handles direct document requests with proper CORS handling and JWT forwarding
+ * Gets file metadata
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  // Get file ID from URL params
-  const fileId = params.id;
-  if (!fileId) {
+  // Check if this is a metadata request
+  const path = request.nextUrl.pathname;
+  if (path.endsWith('/metadata')) {
+    return getFileMetadata(request, params);
+  }
+  
+  // Otherwise, treat as a normal file download request
+  return getFileContent(request, params);
+}
+
+/**
+ * Gets file metadata
+ */
+async function getFileMetadata(
+  request: NextRequest,
+  { id: fileId }: { id: string }
+) {
+  // Log request details
+  console.log(`Metadata request for document: ${fileId}`);
+  
+  // Extract JWT token
+  const token = extractToken(request);
+  
+  if (!token) {
     return NextResponse.json(
-      { error: 'Missing file ID' },
-      { status: 400 }
+      { error: 'No authentication token found' },
+      { status: 401 }
     );
   }
+  
+  try {
+    // Try both direct URLs
+    const urls = [
+      `http://localhost:8222/api/v1/file-storage/${fileId}/metadata`,
+      `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`
+    ];
+    
+    console.log(`Will try these URLs for metadata:`, urls);
+    
+    let response = null;
+    let lastError = null;
+    
+    // Try each URL with retry logic
+    for (const url of urls) {
+      try {
+        console.log(`Attempting metadata fetch from: ${url}`);
+        
+        // Configure request options
+        const options: RequestInit = {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          },
+          cache: 'no-store',
+          // Use a reasonable timeout
+          signal: AbortSignal.timeout(5000)
+        };
+        
+        // Use our retry logic
+        response = await fetchWithRetry(url, options);
+        
+        if (response.ok) {
+          console.log(`Successful metadata response from: ${url}`);
+          break;
+        } else {
+          console.log(`Failed metadata response from: ${url}, status: ${response.status}`);
+        }
+      } catch (error) {
+        console.log(`Error with metadata request to ${url}:`, error);
+        lastError = error;
+      }
+    }
+    
+    // If all URLs failed, return an error
+    if (!response || !response.ok) {
+      console.error('All metadata fetch attempts failed');
+      return NextResponse.json(
+        { error: 'Failed to retrieve metadata' },
+        { status: 502 }
+      );
+    }
+    
+    // Parse the metadata
+    const metadata = await response.json();
+    
+    // Set up CORS headers
+    const headers = new Headers();
+    headers.set('Access-Control-Allow-Origin', '*');
+    headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    
+    // Return the metadata
+    return NextResponse.json(metadata, {
+      status: 200,
+      headers: headers
+    });
+    
+  } catch (error) {
+    console.error('Error proxying metadata:', error);
+    
+    return NextResponse.json(
+      { error: 'Failed to retrieve metadata' },
+      { status: 500 }
+    );
+  }
+}
 
+/**
+ * Handles direct document requests with proper CORS handling and JWT forwarding
+ */
+async function getFileContent(
+  request: NextRequest,
+  { id: fileId }: { id: string }
+) {
   // Log request details
   console.log(`Direct document request for: ${fileId}`);
   
@@ -254,10 +362,10 @@ export async function GET(
   }
   
   try {
-    // Try both direct URLs
+    // Try both direct URLs - prioritize localhost since we're on the same server
     const urls = [
-      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
-      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
+      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
+      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
     ];
     
     console.log(`Will try these URLs in order:`, urls);
