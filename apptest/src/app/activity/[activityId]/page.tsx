@@ -236,9 +236,15 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Estados para manejar la carga de datos
-  const [loading, setLoading] = useState(true);
+  // Activity component states
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [activityId, setActivityId] = useState<string>('');
+  const [isExpired, setIsExpired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userHasSubmitted, setUserHasSubmitted] = useState(false);
   const [submissionError, setSubmissionError] = useState<string>("");
@@ -246,12 +252,6 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [note, setNote] = useState<string>("");
   const [submittedResponse, setSubmittedResponse] = useState<ActivityResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isExpired, setIsExpired] = useState(false);
-  const [activityId, setActivityId] = useState<string>('');
-  const [initializing, setInitializing] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [viewResponses, setViewResponses] = useState(false);
   const [responses, setResponses] = useState<ActivityResponse[]>([]);
@@ -262,8 +262,6 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [gradeValue, setGradeValue] = useState<string>('');
   const [submittingGrade, setSubmittingGrade] = useState(false);
   const [gradeSuccess, setGradeSuccess] = useState(false);
-  const [userId, setUserId] = useState<string>('');
-  const [userName, setUserName] = useState<string>('');
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -281,35 +279,51 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   // Check authentication status and ensure token validity
   useEffect(() => {
     const checkAuth = async () => {
-      try {
-        // Simple auth check - just to get current user info
-        const res = await fetch('/api/auth/check');
-        if (!res.ok) {
-          setAuthError('No se pudo verificar la autenticación. Por favor inicie sesión nuevamente.');
-          setInitializing(false);
-          return;
-        }
-
-        const userData = await res.json();
-        
-        if (!userData || !userData.user) {
-          setAuthError('No se encontró información de usuario. Por favor inicie sesión.');
-          setInitializing(false);
-          return;
-        }
-        
-        // Set user info
-        setUserId(userData.user.id?.toString() || '');
-        setUserName(userData.user.name || '');
-        
-        // Mark auth check as done
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('access_token='))
+        ?.split('=')[1];
+      
+      if (!token) {
+        console.error("No authentication token found");
+        setAuthError("No se encontró un token de autenticación válido. Por favor, inicie sesión nuevamente.");
+        setIsLoading(false);
         setInitializing(false);
         
-        // Begin loading activity data
+        setTimeout(() => {
+          window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+        }, 100);
+        return;
+      }
+      
+      try {
+        // Verify token by making a simple API call
+        const response = await fetch('/api/auth/check', {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.error("Token validation failed");
+          setAuthError("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
+          setIsLoading(false);
+          setInitializing(false);
+          
+          setTimeout(() => {
+            window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
+          }, 100);
+          return;
+        }
+        
+        // Token is valid, proceed with fetching activity data
+        setInitializing(false);
+        setIsLoading(true);
         fetchActivity();
       } catch (error) {
-        console.error('Error checking auth:', error);
-        setAuthError('Error al verificar la autenticación. Por favor recargue la página o inicie sesión nuevamente.');
+        console.error("Error checking authentication:", error);
+        setIsLoading(false);
         setInitializing(false);
       }
     };
