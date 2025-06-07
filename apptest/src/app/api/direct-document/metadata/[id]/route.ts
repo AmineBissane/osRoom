@@ -50,52 +50,36 @@ export async function GET(
   }
   
   try {
-    // Try both direct URLs - prioritize localhost
-    const urls = [
-      `http://localhost:8222/api/v1/file-storage/${fileId}/metadata`,
-      `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`
-    ];
+    // Try direct localhost first - we're inside the VPS
+    const localUrl = `http://localhost:8222/api/v1/file-storage/${fileId}/metadata`;
     
-    console.log(`Will try these URLs for metadata:`, urls);
+    console.log(`Attempting metadata fetch from: ${localUrl}`);
     
-    let response = null;
-    let lastError = null;
+    // Configure request options
+    const options: RequestInit = {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+      cache: 'no-store',
+      // Use a reasonable timeout
+      signal: AbortSignal.timeout(5000)
+    };
     
-    // Try each URL with retry logic
-    for (const url of urls) {
-      try {
-        console.log(`Attempting metadata fetch from: ${url}`);
-        
-        // Configure request options
-        const options: RequestInit = {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-          cache: 'no-store',
-          // Use a reasonable timeout
-          signal: AbortSignal.timeout(5000)
-        };
-        
-        // Use our retry logic
-        response = await fetchWithRetry(url, options);
-        
-        if (response.ok) {
-          console.log(`Successful metadata response from: ${url}`);
-          break;
-        } else {
-          console.log(`Failed metadata response from: ${url}, status: ${response.status}`);
-        }
-      } catch (error) {
-        console.log(`Error with metadata request to ${url}:`, error);
-        lastError = error;
-      }
+    // Try direct localhost call
+    let response = await fetchWithRetry(localUrl, options);
+    
+    // If that fails, try the public IP as a fallback
+    if (!response.ok) {
+      console.log(`Direct localhost metadata request failed, trying public IP`);
+      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/${fileId}/metadata`;
+      response = await fetchWithRetry(publicUrl, options);
     }
     
-    // If all URLs failed, return an error
-    if (!response || !response.ok) {
+    // If all attempts failed, return an error
+    if (!response.ok) {
       console.error('All metadata fetch attempts failed');
       return NextResponse.json(
         { error: 'Failed to retrieve metadata' },

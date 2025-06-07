@@ -997,6 +997,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const getFileUrl = (fileId: string | undefined, preview: boolean = false): string => {
     if (!fileId) return '';
     
+    // Check if we're in a server environment (VPS)
+    if (typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '82.29.168.17') {
+      // Use direct localhost URL when on the server or local development
+      return `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${preview}`;
+    }
+    
     // Use our direct-document API route which handles CORS and authentication
     return `/api/direct-document/${fileId}?preview=${preview}`;
     
@@ -1709,32 +1715,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     };
   }, [isLoading]);
 
-  // Server-side debug logger function
+  /**
+   * Helper function for logging (safe for both client and server)
+   */
   const serverLog = async (message: string, data: any = {}) => {
-    // Only log critical errors in production
-    if (process.env.NODE_ENV !== 'development') {
-      if (!message.includes('Error') && !message.includes('error')) {
-        return;
-      }
-    }
-    
-    try {
-      await fetch('/api/debug', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          component: 'ActivityPage',
-          activityId,
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to log to server:', error);
-    }
+    console.log(message, data);
+    // This is just a console log wrapper - no actual server logging needed
   };
 
   // Add the debug mode indicator

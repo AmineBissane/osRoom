@@ -123,52 +123,36 @@ export async function GET(
   }
   
   try {
-    // Try both direct URLs - prioritize localhost since we're on the same server
-    const urls = [
-      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
-      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
-    ];
+    // Try direct localhost first since we're on the same server
+    // No need for additional proxying inside the VPS
+    const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
-    console.log(`Will try these URLs in order:`, urls);
+    // Configure request options with longer timeout
+    const options: RequestInit = {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': '*/*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+      cache: 'no-store',
+      // Use a longer timeout for document fetching
+      signal: AbortSignal.timeout(30000) // 30 seconds
+    };
     
-    let response = null;
-    let lastError = null;
+    // Attempt the fetch
+    console.log(`Attempting direct document fetch from: ${localUrl}`);
+    let response = await fetchWithRetry(localUrl, options, 3);
     
-    // Try each URL with retry logic
-    for (const url of urls) {
-      try {
-        console.log(`Attempting document fetch from: ${url}`);
-        
-        // Configure request options with longer timeout
-        const options: RequestInit = {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': '*/*',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-          cache: 'no-store',
-          // Use a longer timeout for document fetching
-          signal: AbortSignal.timeout(30000) // 30 seconds
-        };
-        
-        // Use our retry logic
-        response = await fetchWithRetry(url, options, 3); // Increase max retries to 3
-        
-        if (response.ok) {
-          console.log(`Successful response from: ${url}`);
-          break;
-        } else {
-          console.log(`Failed response from: ${url}, status: ${response.status}`);
-        }
-      } catch (error) {
-        console.log(`Error with request to ${url}:`, error);
-        lastError = error;
-      }
+    // If that fails, try the public IP as a fallback
+    if (!response.ok) {
+      console.log(`Direct localhost request failed, trying public IP`);
+      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+      response = await fetchWithRetry(publicUrl, options, 2);
     }
     
     // If all URLs failed, return an error
-    if (!response || !response.ok) {
+    if (!response.ok) {
       console.error('All document fetch attempts failed');
       return NextResponse.json(
         { error: 'Failed to retrieve document from all sources' },
@@ -264,50 +248,69 @@ export async function HEAD(
   }
   
   try {
-    // Try both direct and fallback URLs - prioritize localhost
-    const urls = [
-      `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`,
-      `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`
-    ];
+    // Try direct localhost first - we're inside the VPS
+    const localUrl = `http://localhost:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
     
-    let response = null;
-    let lastError = null;
+    // Create a fetch request with a short timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // shorter timeout for HEAD
     
-    // Try each URL in order
-    for (const url of urls) {
-      try {
-        console.log(`Trying HEAD request to: ${url}`);
+    // Make a HEAD request to the document service
+    console.log(`Trying HEAD request to: ${localUrl}`);
+    let response;
+    
+    try {
+      response = await fetch(localUrl, {
+        method: 'HEAD',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': '*/*',
+        },
+        signal: controller.signal
+      });
+      
+      // Clear the timeout
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.log(`HEAD request to localhost failed, trying public IP`);
+        // Try the public IP as fallback
+        const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+        const backupController = new AbortController();
+        const backupTimeoutId = setTimeout(() => backupController.abort(), 3000);
         
-        // Create a fetch request with a short timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // shorter timeout for HEAD
-        
-        // Make a HEAD request to the document service
-        response = await fetch(url, {
+        response = await fetch(publicUrl, {
           method: 'HEAD',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': '*/*',
           },
-          signal: controller.signal
+          signal: backupController.signal
         });
         
-        // Clear the timeout
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          console.log(`Successful HEAD response from: ${url}`);
-          break;
-        } else {
-          console.log(`Failed HEAD response from: ${url}, status: ${response.status}`);
-        }
-      } catch (error) {
-        console.log(`Error with HEAD request to ${url}:`, error);
-        lastError = error;
+        clearTimeout(backupTimeoutId);
       }
+    } catch (error) {
+      console.log(`Error with HEAD request:`, error);
+      
+      // Try the public IP as fallback
+      const publicUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=${isPreview}`;
+      const backupController = new AbortController();
+      const backupTimeoutId = setTimeout(() => backupController.abort(), 3000);
+      
+      response = await fetch(publicUrl, {
+        method: 'HEAD',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': '*/*',
+        },
+        signal: backupController.signal
+      });
+      
+      clearTimeout(backupTimeoutId);
     }
     
-    // If all URLs failed, return the last error
+    // If all URLs failed, return an error
     if (!response || !response.ok) {
       console.error('All HEAD requests failed');
       return new NextResponse(null, { status: 502 });
