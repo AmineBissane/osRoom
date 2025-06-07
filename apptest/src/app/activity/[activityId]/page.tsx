@@ -247,9 +247,9 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   // Initialize activityId from params when component mounts
   useEffect(() => {
     // Extract ID directly and set it immediately
-    if (params && params.id) {
-      console.log("Setting activity ID from params:", params.id);
-      setActivityId(params.id);
+    if (params && params.activityId) {
+      console.log("Setting activity ID from params:", params.activityId);
+      setActivityId(params.activityId);
     } else {
       console.error("No activity ID found in params");
       setError("No se pudo cargar la actividad: ID no encontrado");
@@ -1192,7 +1192,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       isLoading,
       loadingResponses: false,
       userHasSubmitted,
-      params: params ? { id: params.id } : null,
+      params: params ? { id: params.activityId } : null,
       userId: getCurrentUserId(),
     });
     
