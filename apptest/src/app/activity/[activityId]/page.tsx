@@ -26,6 +26,32 @@ import { useRouter } from "next/navigation"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Add CORS disable script for direct API access
+useEffect(() => {
+  // Create a script element to disable CORS in the iframe
+  const script = document.createElement('script');
+  script.innerHTML = `
+    // Override fetch to add credentials
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      options.credentials = 'include';
+      options.mode = 'cors';
+      return originalFetch(url, options);
+    };
+  `;
+  
+  // Add the script to the head
+  document.head.appendChild(script);
+  
+  return () => {
+    // Clean up
+    if (script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  };
+}, []);
 
 interface Activity {
   id: number | string;
@@ -1099,8 +1125,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [fileType, setFileType] = useState<string | null>(null);
-    const [fileContent, setFileContent] = useState<string | null>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
     
     // Get the access token from cookies
     const getToken = () => {
@@ -1109,92 +1134,83 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       return tokenCookie ? tokenCookie.split('=')[1] : null;
     };
     
+    // Direct API URL with token in the URL to bypass CORS
+    const getDirectUrl = () => {
+      if (!fileId) return '';
+      const token = getToken();
+      return `http://82.29.168.17:8030/api/v1/file-storage/download/${fileId}?preview=true&token=${token}`;
+    };
+    
+    // Handle iframe load event
+    const handleIframeLoad = () => {
+      setLoading(false);
+    };
+    
+    // Handle iframe error event
+    const handleIframeError = () => {
+      setError('Error al cargar el archivo');
+      setLoading(false);
+    };
+    
+    // Set a timeout to handle cases where the iframe doesn't load
     useEffect(() => {
-      const loadPreview = async () => {
-        try {
-          setLoading(true);
-          if (!fileId) {
-            throw new Error('No file ID provided');
-          }
-          
-          // Get the token
-          const token = getToken();
-          if (!token) {
-            throw new Error('No authentication token found');
-          }
-          
-          // Create direct API URL - using the gateway URL
-          const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=true`;
-          
-          // Make the API call with the token
-          const response = await fetch(apiUrl, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`API returned status: ${response.status}`);
-          }
-          
-          // Get the content type
-          const contentType = response.headers.get('content-type') || 'application/octet-stream';
-          setFileType(contentType);
-          
-          // For all file types, get as blob and create object URL
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setFileContent(url);
-          
-          setLoading(false);
-        } catch (err) {
-          console.error('Error loading preview:', err);
-          setError(`No se pudo cargar la vista previa: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-          setLoading(false);
-        }
-      };
-      
-      if (fileId) {
-        loadPreview();
-      } else {
+      if (!fileId) {
         setError('No se proporcionó un ID de archivo');
         setLoading(false);
+        return;
       }
       
-      // Clean up blob URLs on unmount
-      return () => {
-        if (fileContent && fileContent.startsWith('blob:')) {
-          URL.revokeObjectURL(fileContent);
+      const timeout = setTimeout(() => {
+        if (loading) {
+          setError('Tiempo de espera agotado al cargar el archivo');
+          setLoading(false);
         }
+      }, 15000);
+      
+      return () => {
+        clearTimeout(timeout);
       };
-    }, [fileId]);
+    }, [fileId, loading]);
     
-    if (loading) {
-      return <div className="flex justify-center items-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
-      </div>;
+    if (!fileId) {
+      return <div className="text-gray-500 p-4">No hay archivo disponible</div>;
     }
     
-    if (error) {
-      return <div className="text-red-500 p-4">{error}</div>;
-    }
+    const directUrl = getDirectUrl();
     
-    if (!fileContent) {
-      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
-    }
-    
-    // For images
-    if (fileType?.startsWith('image/')) {
-      return <img src={fileContent} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
-    }
-    
-    // For all other files, use iframe
     return (
-      <iframe 
-        src={fileContent} 
-        className="w-full h-[600px] border-0" 
-        title="File preview"
-      />
+      <div className="w-full">
+        {loading && (
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+          </div>
+        )}
+        {error && <div className="text-red-500 p-4">{error}</div>}
+        
+        {/* Direct iframe to API */}
+        <iframe 
+          src={directUrl}
+          className="w-full h-[600px] border-0" 
+          style={{ display: loading && !error ? 'none' : 'block' }}
+          onLoad={handleIframeLoad}
+          onError={handleIframeError}
+          title="File preview"
+        />
+        
+        {/* Add a direct link as fallback */}
+        {error && fileId && (
+          <div className="mt-4 text-center">
+            <a 
+              href={directUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              Abrir archivo directamente
+            </a>
+          </div>
+        )}
+      </div>
     );
   };
 
