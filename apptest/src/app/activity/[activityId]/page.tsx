@@ -1140,8 +1140,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           
           // First, try to get metadata using our improved approach
           try {
-            // Try direct document metadata first
-            const directDocUrl = `/api/direct-document/${fileId}/metadata`;
+            // Try dedicated metadata endpoint first
+            const directDocUrl = `/api/direct-document/metadata/${fileId}`;
             const metadataResponse = await fetch(directDocUrl, {
               headers: {
                 'Authorization': `Bearer ${token}`,
