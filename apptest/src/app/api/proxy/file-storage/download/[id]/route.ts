@@ -22,6 +22,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Log all request details to diagnose issues
+  console.log('FILE DOWNLOAD REQUEST RECEIVED:');
+  console.log('- URL:', request.url);
+  console.log('- Method:', request.method);
+  console.log('- Headers:', Object.fromEntries(request.headers.entries()));
+  
   // Create controller for request timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout (reduced from 20)
@@ -32,6 +38,8 @@ export async function GET(
     
     const searchParams = request.nextUrl.searchParams;
     const isPreview = searchParams.get('preview') === 'true';
+    
+    console.log(`Processing ${isPreview ? 'preview' : 'download'} request for file: ${id}`);
     
     // Get the token from the request cookies
     const token = getAccessToken(request);
@@ -44,8 +52,6 @@ export async function GET(
       );
     }
     
-    console.log(`Proxying file ${isPreview ? 'preview' : 'download'} request for file: ${id}`);
-    
     // Ensure token is properly formatted
     const cleanToken = formatBearerToken(token);
     
@@ -53,6 +59,9 @@ export async function GET(
     // Try the primary URL first with a shorter timeout
     const backendUrl = `http://localhost:8222/api/v1/file-storage/download/${id}?preview=${isPreview}`;
     const fallbackUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`;
+    
+    console.log(`Will try primary URL: ${backendUrl}`);
+    console.log(`Will fallback to: ${fallbackUrl}`);
     
     let response = null;
     let error = null;
@@ -154,16 +163,14 @@ export async function GET(
       // Add content length to help browsers properly load the file
       headers.set('Content-Length', data.byteLength.toString());
       
-      // For PDF files specifically, ensure proper content type
-      if (contentType.includes('pdf')) {
+      // For PDF files specifically, ensure proper content type and force inline display for preview
+      if (contentType.includes('pdf') && isPreview) {
         headers.set('Content-Type', 'application/pdf');
+        headers.set('Content-Disposition', 'inline');
+        // Add additional headers that help with PDF rendering
+        headers.set('X-Content-Type-Options', 'nosniff');
+        headers.set('Accept-Ranges', 'bytes');
       }
-      
-      // Add explicit no-transform header to prevent any proxy modifications
-      headers.set('Cache-Control', 'no-transform, no-store, no-cache, must-revalidate, proxy-revalidate');
-      
-      // Set response type to ensure browser treats as download/blob
-      headers.set('X-Content-Type-Options', 'nosniff');
       
       // Return the response with appropriate headers
       return new NextResponse(data, {

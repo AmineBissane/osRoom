@@ -1056,28 +1056,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     const handleOpenInNewTab = useCallback(() => {
       if (!fileId) return;
       console.log('Abriendo documento en nueva pestaña:', fileUrl);
-      // Use fetch instead of window.open for better control
-      fetch(fileUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': '*/*'
-        }
-      })
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response.blob();
-      })
-      .then(blob => {
-        const objectUrl = URL.createObjectURL(blob);
-        window.open(objectUrl, '_blank');
-        // Clean up after a delay to ensure the window has time to use the URL
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
-      })
-      .catch(e => {
-        console.error('Error opening in new tab:', e);
-        // Fallback to direct window.open
-        window.open(fileUrl, '_blank');
-      });
+      window.open(fileUrl, '_blank');
     }, [fileId, fileUrl]);
     
     // Manejar descarga
@@ -1085,16 +1064,15 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       if (!fileId) return;
       console.log('Descargando documento:', fileId);
       
-      // Instead of using the downloadFile function which has issues
-      // Use direct browser download with proper parameters
+      // Create a download link for direct browser download
       const downloadUrl = getFileUrl(fileId, false);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = fileName || `file-${fileId}`;
+      a.download = fileName || `documento-${fileId.substring(0, 8)}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    }, [fileId, fileName]);
+    }, [fileId, fileName, getFileUrl]);
     
     // Manejar reintentos
     const handleRetry = useCallback(() => {
@@ -1299,14 +1277,52 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       // Timeout de seguridad
       const timeout = setTimeout(() => {
         if (isLoading && displayMode === 'iframe') {
-          console.log('Timeout de carga de documento alcanzado');
-          setError('El visor de documentos no pudo cargar. Utilice los botones para abrir el documento.');
+          console.log('Safety timeout for isLoading', { isLoading });
           setIsLoading(false);
         }
-      }, 15000); // 15 segundos para timeout
+      }, 15000);
       
-      return () => clearTimeout(timeout);
-    }, [fileId, isLoading, displayMode, isNonViewableFile]);
+      // Configurar timeout para la carga del iframe
+      if (displayMode === 'iframe') {
+        console.log('Setting iframe loading timeout');
+        const iframeTimeout = setTimeout(() => {
+          // Ensure a GET request is made directly for the document
+          // This is necessary because sometimes browsers only make HEAD requests
+          fetch(fileUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${document.cookie
+                .split('; ')
+                .find(row => row.startsWith('access_token='))
+                ?.split('=')[1] || ''}`,
+              'Cache-Control': 'no-store, no-cache'
+            }
+          })
+          .then(response => {
+            console.log('GET request for document completed with status:', response.status);
+            if (!response.ok) {
+              setError(`Error al cargar documento (${response.status}). Por favor descargue el archivo.`);
+              setIsLoading(false);
+            }
+          })
+          .catch(err => {
+            console.error('Error making GET request for document:', err);
+            setError('Error de conexión. Por favor descargue el archivo o intente más tarde.');
+            setIsLoading(false);
+          });
+        }, 1000); // Wait 1 second before forcing GET request
+        
+        return () => {
+          console.log('Cleared iframe loading timeout');
+          clearTimeout(timeout);
+          clearTimeout(iframeTimeout);
+        };
+      }
+      
+      return () => {
+        clearTimeout(timeout);
+      };
+    }, [fileId, isLoading, displayMode, isNonViewableFile, fileUrl]);
     
     // Efecto para descargar automáticamente archivos no visualizables
     useEffect(() => {
@@ -1541,76 +1557,64 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           </div>
         )}
         
-        {/* Using object tag instead of iframe for better file handling */}
-        <object 
-          key={`document-preview-${fileId}-${retryCount}`}
-          data={fileUrl}
-          type="application/pdf"
-          className={`w-full h-full min-h-[500px] border-0 ${isLoading || error ? 'hidden' : ''}`}
-          onLoad={() => {
-            console.log('Documento cargado correctamente');
-            setIsLoading(false);
-          }}
-                    onError={() => {
-            console.error('Error al cargar el documento');
-            setIsLoading(false);
-            setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
-          }}
-        >
-          <p className="text-center text-muted-foreground p-4 border border-dashed rounded-md">
-            No se puede mostrar el documento en esta ventana. Por favor, utilice las opciones para 
-            <Button variant="link" size="sm" onClick={handleOpenInNewTab} className="mx-1">abrir en una nueva pestaña</Button>
-            o 
-            <Button variant="link" size="sm" onClick={handleDownload} className="mx-1">descargar el archivo</Button>
-          </p>
-        </object>
-          <div className="relative w-full h-[400px] border rounded bg-gray-50">
-            {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-              <p className="text-gray-500">Cargando documento...</p>
+        {/* Document viewer - using iframe for better PDF rendering with prefetch hack */}
+        {!isLoading && !error && (
+          <div className="border rounded min-h-[500px] overflow-hidden">
+            {/* Hidden link to force GET request for the document */}
+            <div style={{ display: 'none' }}>
+              <a 
+                href={fileUrl} 
+                target="_blank" 
+                ref={(el) => {
+                  // Auto-click the link to force a GET request
+                  if (el && retryCount > 0) {
+                    console.log('Auto-clicking hidden link to trigger GET request');
+                    el.click();
+                    // Don't actually open the tab
+                    setTimeout(() => {
+                      try {
+                        window.stop();
+                      } catch (e) {
+                        console.log('Window.stop() not supported');
+                      }
+                    }, 100);
+                  }
+                }}
+              >
+                Force GET
+              </a>
             </div>
-          )}
-          
-          {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 z-20">
-              <XCircle className="h-12 w-12 text-destructive mb-2" />
-              <p className="text-center mb-4">{error}</p>
-              <div className="flex gap-2">
-                <Button onClick={handleRetry} variant="outline">
-                  Reintentar
-                </Button>
-                <Button onClick={handleShowButtonsOnly} variant="default">
-                  Solo botones
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Using object tag instead of iframe for better file handling */}
-          <object 
-            key={`document-preview-${fileId}-${retryCount}`}
-            data={fileUrl}
-            type="application/pdf"
-            className={`w-full h-full border-0 ${isLoading || error ? 'hidden' : ''}`}
-            onLoad={() => {
-              console.log('Documento cargado correctamente');
-              setIsLoading(false);
-            }}
-            onError={() => {
-              console.error('Error al cargar el documento');
-              setIsLoading(false);
-              setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
-            }}
-          >
-            <p className="text-center p-4">
-              El navegador no puede mostrar este documento. 
-              <Button onClick={handleDownload} variant="link" className="ml-2">
-                Descargar archivo
-              </Button>
-            </p>
-          </object>
-        </div>
+            
+            <iframe 
+              key={`document-preview-${fileId}-${retryCount}`}
+              src={fileUrl}
+              className="w-full h-full min-h-[500px] border-0"
+              // Remove sandbox to allow PDF rendering in all browsers
+              onLoad={(e) => {
+                console.log('Documento cargado correctamente en iframe');
+                // Log iframe details
+                const iframe = e.currentTarget as HTMLIFrameElement;
+                console.log('iframe contentDocument:', iframe.contentDocument ? 'Available' : 'Null/Restricted');
+                console.log('iframe contentWindow:', iframe.contentWindow ? 'Available' : 'Null/Restricted');
+                if (iframe.contentDocument) {
+                  console.log('Content type:', iframe.contentDocument.contentType);
+                }
+                setIsLoading(false);
+              }}
+              onError={(e) => {
+                console.error('Error al cargar el documento en iframe');
+                // Log error details
+                const iframe = e.currentTarget as HTMLIFrameElement;
+                console.error('iframe error details:', {
+                  src: iframe.src,
+                  hasContent: iframe.contentDocument !== null,
+                });
+                setIsLoading(false);
+                setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   });
