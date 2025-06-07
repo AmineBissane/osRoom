@@ -999,28 +999,42 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // Create preview URL
-          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
-          setPreviewUrl(previewUrl);
-          
-          // Get file metadata to determine type
+          // First get file metadata to determine type
           const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
           if (metadataResponse.ok) {
             const metadata = await metadataResponse.json();
             setFileType(metadata.contentType);
             
-            // If it's a text file, fetch the content
-            if (metadata.contentType?.startsWith('text/') || 
-                metadata.contentType === 'application/json' ||
-                metadata.contentType === 'application/javascript' ||
-                metadata.contentType === 'application/xml' ||
-                metadata.contentType === 'application/x-yaml') {
-              const textResponse = await fetch(previewUrl);
+            // Check if it's a text file
+            const isTextFile = 
+              metadata.contentType?.startsWith('text/') || 
+              metadata.contentType === 'application/json' ||
+              metadata.contentType === 'application/javascript' ||
+              metadata.contentType === 'application/xml' ||
+              metadata.contentType === 'application/x-yaml';
+            
+            if (isTextFile) {
+              // For text files, fetch the content directly
+              console.log('Fetching text file content');
+              const textResponse = await fetch(`/api/proxy/file-storage/download/${fileId}?preview=true`);
               if (textResponse.ok) {
                 const text = await textResponse.text();
                 setTextContent(text);
+                console.log('Text content loaded successfully');
+              } else {
+                console.error('Failed to load text content:', textResponse.status);
+                setError(`Error loading text content: ${textResponse.status}`);
               }
+            } else {
+              // For non-text files, use the preview URL
+              setPreviewUrl(`/api/proxy/file-storage/download/${fileId}?preview=true`);
+              console.log('Non-text file, using preview URL');
             }
+          } else {
+            console.error('Failed to load metadata:', metadataResponse.status);
+            setError(`Error loading metadata: ${metadataResponse.status}`);
+            // Fallback to direct preview URL
+            setPreviewUrl(`/api/proxy/file-storage/download/${fileId}?preview=true`);
           }
           
           setLoading(false);
@@ -1039,102 +1053,52 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       }
     }, [fileId]);
     
-    if (loading) {
+    const renderContent = () => {
+      if (loading) {
+        return <div className="flex justify-center items-center p-8"><div className="loader"></div></div>;
+      }
+      
+      if (error) {
+        return <div className="text-red-500 p-4">{error}</div>;
+      }
+      
+      // For text content, render it directly
+      if (textContent) {
+        return (
+          <div className="p-4 overflow-auto max-h-[600px] whitespace-pre-wrap font-mono text-sm bg-gray-50 border rounded">
+            {textContent}
+          </div>
+        );
+      }
+      
+      // For other file types, use iframe or img
+      if (fileType?.startsWith('image/')) {
+        return <img src={previewUrl} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+      }
+      
       return (
-        <div className="flex justify-center items-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
-        </div>
+        <iframe 
+          src={previewUrl} 
+          className="w-full h-[600px] border-0" 
+          title="File preview"
+        />
       );
-    }
-    
-    if (error || !fileId) {
-      return (
-        <div className="p-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md">
-          <p>{error || 'No hay archivo disponible'}</p>
-          {!hideButtons && fileId && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => downloadFile(fileId)}
-              className="mt-2"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Descargar archivo
-            </Button>
-          )}
-        </div>
-      );
-    }
+    };
     
     return (
-      <div className="space-y-2">
+      <div className="w-full">
+        {renderContent()}
         {!hideButtons && (
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              Vista previa del archivo
-            </p>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => downloadFile(fileId)}
+          <div className="mt-4 flex justify-end">
+            <a 
+              href={`/api/proxy/file-storage/download/${fileId}`} 
+              download
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
             >
-              <Download className="h-4 w-4 mr-2" />
               Descargar
-            </Button>
+            </a>
           </div>
         )}
-        <div className="border rounded-md overflow-hidden bg-white">
-          {fileType?.startsWith('image/') ? (
-            <img 
-              src={previewUrl} 
-              alt="Vista previa" 
-              className="w-full h-[400px] object-contain"
-              onError={() => setError('Error al cargar la imagen')}
-            />
-          ) : fileType?.startsWith('video/') ? (
-            <video 
-              src={previewUrl} 
-              controls 
-              className="w-full h-[400px]"
-              onError={() => setError('Error al cargar el video')}
-            >
-              Tu navegador no soporta la reproducción de video.
-            </video>
-          ) : fileType === 'application/pdf' ? (
-            <iframe 
-              src={previewUrl}
-              className="w-full h-[400px]" 
-              title="Vista previa PDF"
-              sandbox="allow-same-origin allow-scripts"
-              onError={() => setError('Error al cargar el PDF')}
-            />
-          ) : (fileType?.startsWith('text/') || 
-              fileType === 'application/json' ||
-              fileType === 'application/javascript' ||
-              fileType === 'application/xml' ||
-              fileType === 'application/x-yaml') ? (
-            <div className="p-4 max-h-[400px] overflow-auto">
-              <pre className="whitespace-pre-wrap break-words text-sm font-mono">
-                {textContent || 'No se pudo cargar el contenido del archivo'}
-              </pre>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[400px] gap-4">
-              <FileText className="h-16 w-16 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Vista previa no disponible para este tipo de archivo
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => downloadFile(fileId)}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Descargar archivo
-              </Button>
-            </div>
-          )}
-        </div>
       </div>
     );
   };

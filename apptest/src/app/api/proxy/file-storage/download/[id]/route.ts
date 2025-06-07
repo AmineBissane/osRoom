@@ -73,7 +73,24 @@ export async function GET(
       }
     }
 
-    // Create a new response with the file data
+    // Special handling for text files
+    const isTextFile = 
+      contentType.startsWith('text/') || 
+      contentType === 'application/json' ||
+      contentType === 'application/javascript' ||
+      contentType === 'application/xml' ||
+      contentType === 'application/x-yaml';
+
+    if (isPreview && isTextFile) {
+      // For text files, we read the entire content and return it directly
+      const text = await response.text();
+      return new NextResponse(text, {
+        status: 200,
+        headers: headers
+      });
+    }
+
+    // For other files, stream the response
     return new NextResponse(response.body, {
       status: 200,
       headers: headers,
