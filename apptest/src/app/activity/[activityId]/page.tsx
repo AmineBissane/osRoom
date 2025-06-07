@@ -1095,6 +1095,109 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     );
   };
 
+  // Direct document preview component for response details dialog
+  const DirectDocumentPreview = ({ fileId }: { fileId: string | undefined }) => {
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+    const [fileType, setFileType] = useState<string | null>(null);
+    const [fileContent, setFileContent] = useState<string | null>(null);
+    
+    // Get the access token from cookies
+    const getToken = () => {
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('access_token='));
+      return tokenCookie ? tokenCookie.split('=')[1] : null;
+    };
+    
+    useEffect(() => {
+      const loadPreview = async () => {
+        try {
+          setLoading(true);
+          if (!fileId) {
+            throw new Error('No file ID provided');
+          }
+          
+          // Get the token
+          const token = getToken();
+          if (!token) {
+            throw new Error('No authentication token found');
+          }
+          
+          // Create direct API URL - using the gateway URL
+          const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${fileId}?preview=true`;
+          
+          // Make the API call with the token
+          const response = await fetch(apiUrl, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API returned status: ${response.status}`);
+          }
+          
+          // Get the content type
+          const contentType = response.headers.get('content-type') || 'application/octet-stream';
+          setFileType(contentType);
+          
+          // For all file types, get as blob and create object URL
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setFileContent(url);
+          
+          setLoading(false);
+        } catch (err) {
+          console.error('Error loading preview:', err);
+          setError(`No se pudo cargar la vista previa: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+          setLoading(false);
+        }
+      };
+      
+      if (fileId) {
+        loadPreview();
+      } else {
+        setError('No se proporcionó un ID de archivo');
+        setLoading(false);
+      }
+      
+      // Clean up blob URLs on unmount
+      return () => {
+        if (fileContent && fileContent.startsWith('blob:')) {
+          URL.revokeObjectURL(fileContent);
+        }
+      };
+    }, [fileId]);
+    
+    if (loading) {
+      return <div className="flex justify-center items-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+      </div>;
+    }
+    
+    if (error) {
+      return <div className="text-red-500 p-4">{error}</div>;
+    }
+    
+    if (!fileContent) {
+      return <div className="text-gray-500 p-4">No hay contenido disponible</div>;
+    }
+    
+    // For images
+    if (fileType?.startsWith('image/')) {
+      return <img src={fileContent} alt="Preview" className="max-w-full max-h-[600px] object-contain" />;
+    }
+    
+    // For all other files, use iframe
+    return (
+      <iframe 
+        src={fileContent} 
+        className="w-full h-[600px] border-0" 
+        title="File preview"
+      />
+    );
+  };
+
   // Add safety timeout for loading state
   useEffect(() => {
     let safetyTimeoutId: NodeJS.Timeout | null = null;
@@ -1593,16 +1696,7 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               {selectedResponse.responseFileId && (
                 <div>
                   <h4 className="font-medium">Archivo Adjunto</h4>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => downloadFile(selectedResponse.responseFileId)}
-                    className="w-full mt-2"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Descargar archivo
-                  </Button>
-                  <DocumentPreview fileId={selectedResponse.responseFileId} />
+                  <DirectDocumentPreview fileId={selectedResponse.responseFileId} />
                 </div>
               )}
             </div>
