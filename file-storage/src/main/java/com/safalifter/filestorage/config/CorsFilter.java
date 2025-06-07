@@ -61,49 +61,7 @@ public class CorsFilter implements Filter {
     @Override
     public void destroy() {
         System.out.println("CORS Filter destroyed");
-    }
-
-// Add this to your existing controller or create a new test controller
-    
-        
-        // Test endpoint to verify CORS is working
-        @GetMapping("/test")
-        public ResponseEntity<String> testCors() {
-            System.out.println("Test endpoint called");
-            return ResponseEntity.ok()
-                    .header("Content-Type", "text/plain")
-                    .header("X-Test", "CORS-Working")
-                    .body("CORS is working! Server time: " + new java.util.Date());
-        }
-        
-        // Your existing download endpoint
-        @GetMapping("/download/{fileId}")
-        public ResponseEntity<?> downloadFile(@PathVariable String fileId, 
-                                            @RequestParam(required = false) Boolean preview) {
-            
-            System.out.println("=== DOWNLOAD ENDPOINT ===");
-            System.out.println("FileId: " + fileId);
-            System.out.println("Preview: " + preview);
-            System.out.println("========================");
-            
-            try {
-                // FOR TESTING: Return a simple response first
-                String testContent = "This is a test file content for fileId: " + fileId;
-                
-                return ResponseEntity.ok()
-                        .header("Content-Type", "text/plain")
-                        .header("Content-Disposition", preview != null && preview ? "inline" : "attachment; filename=\"test.txt\"")
-                        .header("X-Debug-Endpoint", "Working")
-                        .body(testContent);
-                        
-            } catch (Exception e) {
-                System.err.println("Error in download endpoint: " + e.getMessage());
-                e.printStackTrace();
-                return ResponseEntity.status(500)
-                        .header("Content-Type", "text/plain")
-                        .body("Error: " + e.getMessage());
-            }
-        }        
+    } 
     
 }
 
