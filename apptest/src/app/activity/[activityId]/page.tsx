@@ -1008,11 +1008,18 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // Use our proxy to avoid CORS issues
-          const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          // Use our proxy to avoid CORS issues - add timestamp to prevent caching
+          const timestamp = new Date().getTime();
+          const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
           
           // Make the request through our proxy
-          const response = await fetch(proxyUrl);
+          const response = await fetch(proxyUrl, {
+            cache: 'no-store',
+            headers: {
+              'Pragma': 'no-cache',
+              'Cache-Control': 'no-cache'
+            }
+          });
           
           if (!response.ok) {
             throw new Error(`Proxy returned status: ${response.status}`);
@@ -1135,12 +1142,20 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       }
       
       // Use the proxy endpoint instead of direct API call to avoid CORS issues
-      const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const proxyUrl = `/api/proxy/file-storage/download/${fileId}?preview=true&t=${timestamp}`;
       
       const fetchFile = async () => {
         try {
           console.log(`Fetching file from proxy: ${proxyUrl}`);
-          const response = await fetch(proxyUrl);
+          const response = await fetch(proxyUrl, {
+            cache: 'no-store',
+            headers: {
+              'Pragma': 'no-cache',
+              'Cache-Control': 'no-cache'
+            }
+          });
           
           if (!response.ok) {
             throw new Error(`API returned status: ${response.status}`);

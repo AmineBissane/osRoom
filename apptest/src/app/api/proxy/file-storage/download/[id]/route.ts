@@ -13,6 +13,9 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
+export const dynamic = 'force-dynamic'; // Disable caching for this route
+export const fetchCache = 'force-no-store';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -47,6 +50,7 @@ export async function GET(
         'Authorization': cleanToken,
         'Accept': '*/*',
       },
+      cache: 'no-store',
     });
     
     console.log(`Response status: ${response.status}`);
@@ -68,14 +72,14 @@ export async function GET(
       ? 'inline'
       : (contentDisposition || `attachment; filename="file-${id}"`);
     
-    // Get the response data
-    const data = await response.arrayBuffer();
-    
     // Set appropriate headers for CORS and content handling
     const headers = new Headers();
     headers.set('Content-Type', contentType);
     headers.set('Content-Disposition', disposition);
-    headers.set('Cache-Control', isPreview ? 'public, max-age=300' : 'private, no-cache');
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+    headers.set('Surrogate-Control', 'no-store');
     
     // Add CORS headers to ensure browser can properly handle the response
     headers.set('Access-Control-Allow-Origin', '*');
@@ -89,8 +93,16 @@ export async function GET(
       headers.set('Content-Type', 'application/pdf');
     }
     
+    // Create a new ReadableStream that will pipe the response body
+    const { readable, writable } = new TransformStream();
+    
+    // Pipe the response body to our writable stream
+    response.body?.pipeTo(writable).catch(error => {
+      console.error('Error piping response:', error);
+    });
+    
     // Return the response with appropriate headers
-    return new NextResponse(data, {
+    return new NextResponse(readable, {
       status: 200,
       headers: headers
     });
