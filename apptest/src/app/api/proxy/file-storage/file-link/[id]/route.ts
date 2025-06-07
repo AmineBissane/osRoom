@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRouteParams, getAccessToken, formatBearerToken } from '@/app/api/utils';
 
 // Handle OPTIONS requests for CORS preflight
 export async function OPTIONS(request: NextRequest) {
@@ -22,13 +23,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    // Use utility function to safely get route params
+    const { id } = await getRouteParams(params);
+    
     const searchParams = request.nextUrl.searchParams;
     const isPreview = searchParams.get('preview') === 'true';
     const direct = searchParams.get('direct') === 'true';
     
     // Get the token from the request cookies
-    const token = request.cookies.get('access_token')?.value;
+    const token = getAccessToken(request);
     
     if (!token) {
       return NextResponse.json(
@@ -40,7 +43,7 @@ export async function GET(
     console.log(`Generating link for file: ${id}`);
     
     // Ensure token is properly formatted
-    const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    const cleanToken = formatBearerToken(token);
     
     // Generate the direct URL to the backend API
     const directUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`;

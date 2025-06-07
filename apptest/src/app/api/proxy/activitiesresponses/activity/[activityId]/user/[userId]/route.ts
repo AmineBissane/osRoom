@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getRouteParams, getAccessToken, formatBearerToken } from '@/app/api/utils';
 
 // Add timeout for fetch requests
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 10000) => {
@@ -20,13 +21,12 @@ export async function GET(
   request: Request,
   { params }: { params: { activityId: string; userId: string } }
 ) {
-  const { activityId, userId } = params;
+  // Use utility function to safely get route params
+  const { activityId, userId } = await getRouteParams(params);
   
   try {
-    // Get the token from cookies header
-    const cookieHeader = request.headers.get('cookie') || '';
-    const tokenMatch = cookieHeader.match(/access_token=([^;]+)/);
-    const token = tokenMatch ? tokenMatch[1] : null;
+    // Get the token from cookies
+    const token = getAccessToken(request);
     
     if (!token) {
       return NextResponse.json(
@@ -35,6 +35,9 @@ export async function GET(
       );
     }
     
+    // Format the token
+    const cleanToken = formatBearerToken(token);
+    
     // Build the URL
     const apiUrl = `http://82.29.168.17:8222/api/v1/activitiesresponses/activity/${activityId}/user/${userId}`;
     
@@ -42,7 +45,7 @@ export async function GET(
       // Make request to backend with timeout
       const response = await fetchWithTimeout(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': cleanToken,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },

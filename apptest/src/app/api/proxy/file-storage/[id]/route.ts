@@ -5,7 +5,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    // Await params to fix the synchronous parameter access issue
+    const paramsData = await Promise.resolve(params);
+    const id = paramsData.id;
+    
     const preview = request.nextUrl.searchParams.get('preview') === 'true';
     
     // Get the token from the request cookies
