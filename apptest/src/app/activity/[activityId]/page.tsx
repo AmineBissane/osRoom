@@ -998,21 +998,27 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             throw new Error('No file ID provided');
           }
           
-          // First, try to get file metadata to determine type
-          const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
-          if (metadataResponse.ok) {
-            const metadata = await metadataResponse.json();
-            setFileType(metadata.contentType);
-          }
-          
           // Create preview URL
           const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
           setPreviewUrl(previewUrl);
           
-          // Check if file is accessible
-          const checkResponse = await fetch(previewUrl, { method: 'HEAD' });
-          if (!checkResponse.ok) {
-            throw new Error('No se pudo acceder al archivo');
+          // Get file metadata to determine type
+          try {
+            const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
+            if (metadataResponse.ok) {
+              const metadata = await metadataResponse.json();
+              setFileType(metadata.contentType);
+            } else {
+              // If metadata fails, we'll try to detect type from preview response
+              const previewResponse = await fetch(previewUrl, { method: 'HEAD' });
+              const contentType = previewResponse.headers.get('content-type');
+              if (contentType) {
+                setFileType(contentType);
+              }
+            }
+          } catch (err) {
+            console.warn('Could not determine file type:', err);
+            // Continue without file type - we'll show generic preview
           }
           
         } catch (err) {
@@ -1081,12 +1087,14 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               src={previewUrl} 
               alt="Vista previa" 
               className="w-full h-[400px] object-contain"
+              onError={() => setError('Error al cargar la imagen')}
             />
           ) : fileType?.startsWith('video/') ? (
             <video 
               src={previewUrl} 
               controls 
               className="w-full h-[400px]"
+              onError={() => setError('Error al cargar el video')}
             >
               Tu navegador no soporta la reproducción de video.
             </video>
@@ -1095,6 +1103,8 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               src={previewUrl}
               className="w-full h-[400px]" 
               title="Vista previa PDF"
+              sandbox="allow-same-origin allow-scripts"
+              onError={() => setError('Error al cargar el PDF')}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-[400px] gap-4">

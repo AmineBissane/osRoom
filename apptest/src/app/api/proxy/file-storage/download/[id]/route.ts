@@ -6,6 +6,8 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const searchParams = request.nextUrl.searchParams;
+    const isPreview = searchParams.get('preview') === 'true';
     
     // Get the token from the request cookies
     const token = request.cookies.get('access_token')?.value;
@@ -17,13 +19,13 @@ export async function GET(
       );
     }
     
-    console.log(`Proxying file download request for file: ${id}`);
+    console.log(`Proxying file ${isPreview ? 'preview' : 'download'} request for file: ${id}`);
     
     // Ensure token is properly formatted
     const cleanToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     
     // Make the request to the gateway
-    const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/download/${id}`;
+    const apiUrl = `http://82.29.168.17:8222/api/v1/file-storage/${isPreview ? 'preview' : 'download'}/${id}`;
     console.log(`Making request to: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
@@ -50,12 +52,18 @@ export async function GET(
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
     
+    // For previews, we want to display inline instead of downloading
+    const disposition = isPreview 
+      ? 'inline'
+      : (contentDisposition || `attachment; filename="file-${id}"`);
+    
     // Create a new response with the file data
     const newResponse = new NextResponse(blob, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': contentDisposition || `attachment; filename="file-${id}"`
+        'Content-Disposition': disposition,
+        'Cache-Control': isPreview ? 'public, max-age=300' : 'private, no-cache'
       }
     });
     
