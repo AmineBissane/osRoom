@@ -261,7 +261,9 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const [showGradeForm, setShowGradeForm] = useState(false);
   const [gradeValue, setGradeValue] = useState<string>('');
   const [submittingGrade, setSubmittingGrade] = useState(false);
-  const [isTeacher, setIsTeacher] = useState(false);
+  const [gradeSuccess, setGradeSuccess] = useState(false);
+  const [userId, setUserId] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
 
   // Initialize activityId from params when component mounts
   useEffect(() => {
@@ -279,43 +281,36 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   // Check authentication status and ensure token validity
   useEffect(() => {
     const checkAuth = async () => {
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_token='))
-        ?.split('=')[1];
-      
-      if (!token) {
-        console.error("No authentication token found");
-        setAuthError("No se encontró un token de autenticación válido. Por favor, inicie sesión nuevamente.");
-        setIsLoading(false);
-        
-        setTimeout(() => {
-          window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
-        }, 100);
-        return;
-      }
-      
       try {
-        // Verify token by making a simple API call
-        const response = await fetch('/api/auth/check', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          console.error("Token validation failed");
-          setAuthError("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
-          setIsLoading(false);
-          
-          setTimeout(() => {
-            window.location.href = "/login?from=" + encodeURIComponent(window.location.pathname);
-          }, 100);
+        // Simple auth check - just to get current user info
+        const res = await fetch('/api/auth/check');
+        if (!res.ok) {
+          setAuthError('No se pudo verificar la autenticación. Por favor inicie sesión nuevamente.');
+          setInitializing(false);
+          return;
         }
+
+        const userData = await res.json();
+        
+        if (!userData || !userData.user) {
+          setAuthError('No se encontró información de usuario. Por favor inicie sesión.');
+          setInitializing(false);
+          return;
+        }
+        
+        // Set user info
+        setUserId(userData.user.id?.toString() || '');
+        setUserName(userData.user.name || '');
+        
+        // Mark auth check as done
+        setInitializing(false);
+        
+        // Begin loading activity data
+        fetchActivity();
       } catch (error) {
-        console.error("Error checking authentication:", error);
-        setIsLoading(false);
+        console.error('Error checking auth:', error);
+        setAuthError('Error al verificar la autenticación. Por favor recargue la página o inicie sesión nuevamente.');
+        setInitializing(false);
       }
     };
     
@@ -986,12 +981,20 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     console.log('Viewing response detail:', response);
     // Log the response file ID specifically to debug
     console.log('Response file ID:', response.responseFileId);
+    
+    // Reset grade form state
+    setShowGradeForm(false);
+    
+    // Set initial grade value if response has a grade
+    if (response.grade !== undefined && response.grade !== null) {
+      setGradeValue(response.grade.toString());
+    } else {
+      setGradeValue('');
+    }
+    
     setSelectedResponse(response);
     setViewResponseDetail(true);
   };
-
-  // Function to save a grade for a response
-  const saveGrade = () => {};
 
   // Function to get a file URL for download or preview
   const getFileUrl = (fileId: string | undefined, preview: boolean = false): string => {
@@ -999,6 +1002,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     
     // Always use our direct-document API route which handles CORS and authentication
     return `/api/direct-document/${fileId}?preview=${preview}`;
+  };
+
+  // Function to save a grade (integrate with handleGradeSubmit)
+  const saveGrade = (responseId: string | number | undefined) => {
+    // Use the existing handleGradeSubmit function
+    handleGradeSubmit(responseId);
   };
 
   // DocumentPreview component optimizado con memo para evitar re-renderizados
@@ -1223,9 +1232,23 @@ export default function ActivityPage({ params }: { params: { activityId: string 
       if (selectedResponse) {
         setSelectedResponse({
           ...selectedResponse,
-          grade: gradeNum
+          grade: gradeNum,
+          gradedAt: new Date().toISOString()
         });
       }
+      
+      // Also update the response in the responses list
+      setResponses(prevResponses => 
+        prevResponses.map(resp => 
+          resp.id === responseId 
+            ? { ...resp, grade: gradeNum, gradedAt: new Date().toISOString() } 
+            : resp
+        )
+      );
+      
+      // Show success message
+      setGradeSuccess(true);
+      setTimeout(() => setGradeSuccess(false), 3000); // Hide after 3 seconds
       
       toast.success('Calificación guardada correctamente');
       setShowGradeForm(false);
@@ -1627,65 +1650,110 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             </div>
             
             {/* Grade form */}
-            {isTeacher && (
-              <div className="border rounded p-4">
-                <h3 className="font-medium mb-2">Calificación</h3>
-                {selectedResponse?.grade !== undefined && selectedResponse?.grade !== null ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium">Calificación actual: </span>
-                      <span className="text-lg">{selectedResponse.grade}</span>
+            <div className="border rounded p-4">
+              <h3 className="font-medium mb-2">Calificación</h3>
+              {selectedResponse?.grade !== undefined && selectedResponse?.grade !== null ? (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">Calificación actual: </span>
+                    <span className="text-lg">{selectedResponse.grade}</span>
+                  </div>
+                  <Button onClick={() => setShowGradeForm(true)} variant="outline" size="sm">
+                    Modificar calificación
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  {!showGradeForm ? (
+                    <Button onClick={() => setShowGradeForm(true)} variant="default" size="sm">
+                      Calificar respuesta
+                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <Input 
+                          type="number" 
+                          placeholder="Calificación (0-10)" 
+                          className="w-40"
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          value={gradeValue}
+                          onChange={handleGradeInputChange}
+                        />
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => saveGrade(selectedResponse?.id)}
+                          disabled={submittingGrade}
+                        >
+                          {submittingGrade ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Guardando...
+                            </>
+                          ) : (
+                            'Guardar calificación'
+                          )}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setShowGradeForm(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
                     </div>
-                    <Button onClick={() => setShowGradeForm(true)} variant="outline" size="sm">
-                      Modificar calificación
+                  )}
+                </div>
+              )}
+              
+              {showGradeForm && selectedResponse?.grade !== undefined && (
+                <div className="mt-4 space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Input 
+                      type="number" 
+                      placeholder="Nueva calificación (0-10)" 
+                      className="w-40"
+                      min={0}
+                      max={10}
+                      step={0.1}
+                      value={gradeValue}
+                      onChange={handleGradeInputChange}
+                    />
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => saveGrade(selectedResponse?.id)}
+                      disabled={submittingGrade}
+                    >
+                      {submittingGrade ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Actualizando...
+                        </>
+                      ) : (
+                        'Actualizar calificación'
+                      )}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setShowGradeForm(false)}
+                    >
+                      Cancelar
                     </Button>
                   </div>
-                ) : (
-                  <div>
-                    {!showGradeForm ? (
-                      <Button onClick={() => setShowGradeForm(true)} variant="default" size="sm">
-                        Calificar respuesta
-                      </Button>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                          <Input 
-                            type="number" 
-                            placeholder="Calificación (0-10)" 
-                            className="w-40"
-                            min={0}
-                            max={10}
-                            step={0.1}
-                            value={gradeValue}
-                            onChange={handleGradeInputChange}
-                          />
-                          <Button 
-                            variant="default" 
-                            size="sm"
-                            onClick={() => handleGradeSubmit(selectedResponse?.id)}
-                            disabled={submittingGrade}
-                          >
-                            {submittingGrade ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Guardando...
-                              </>
-                            ) : (
-                              'Guardar calificación'
-                            )}
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setShowGradeForm(false)}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                </div>
+              )}
+            </div>
+            
+            {/* Success message */}
+            {gradeSuccess && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 flex items-center">
+                <CheckCircle2 className="h-5 w-5 mr-2 text-green-600" />
+                Calificación guardada correctamente
               </div>
             )}
           </div>
