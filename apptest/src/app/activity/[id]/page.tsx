@@ -787,16 +787,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         throw new Error('No se encontró el token de autenticación');
       }
 
-      // Decode token to get user info
-      const decodedToken = decodeJwt(token);
-      if (!decodedToken) {
-        throw new Error('No se pudo decodificar el token');
-      }
-
-      // Get user info from token
-      const userId = decodedToken.sub || '';
-      const userName = decodedToken.name || decodedToken.preferred_username || 'Unknown User';
-
       // Create FormData for direct backend request
       const formData = new FormData();
       
@@ -813,17 +803,12 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       if (note && note.trim()) {
         formData.append('finalNote', note);
       }
+
+      // Add required fields to formData
+      formData.append('activityId', activityId);
       
-      // Build the backend URL with query parameters
-      const url = new URL('http://82.29.168.17:8222/api/v1/activitiesresponses/with-file');
-      url.searchParams.append('activityId', activityId);
-      url.searchParams.append('studentId', userId);
-      url.searchParams.append('studentName', userName);
-      
-      console.log('Enviando solicitud directamente al backend:', url.toString());
-      
-      // Send request directly to backend
-      const response = await fetch(url.toString(), {
+      // Send request through our proxy instead of directly to backend
+      const response = await fetch('/api/proxy/activitiesresponses/with-file', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -831,29 +816,22 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
         body: formData
       });
       
-      console.log('Estado de respuesta del backend:', response.status);
+      console.log('Estado de respuesta:', response.status);
       
       if (!response.ok) {
         // Handle error responses
-        try {
-          const errorText = await response.text();
-          console.error('Error del backend:', errorText);
-          
-          // Check for "already submitted" error
-          if (response.status === 400 && errorText.includes('already submitted')) {
-            setUserHasSubmitted(true);
-            toast.error('Ya has enviado una respuesta para esta actividad');
-            setIsSubmitting(false);
-            return;
-          }
-          
-          throw new Error(`Error ${response.status}: ${errorText}`);
-        } catch (textError) {
-          if (textError instanceof Error && textError.message.includes('body stream already read')) {
-            throw new Error(`Error ${response.status}: No se pudo leer el detalle del error`);
-          }
-          throw textError;
+        const errorText = await response.text();
+        console.error('Error del servidor:', errorText);
+        
+        // Check for specific error cases
+        if (response.status === 400 && errorText.includes('already submitted')) {
+          setUserHasSubmitted(true);
+          toast.error('Ya has enviado una respuesta para esta actividad');
+          setIsSubmitting(false);
+          return;
         }
+        
+        throw new Error(`Error ${response.status}: ${errorText || 'Error desconocido'}`);
       }
 
       // Success case
@@ -878,8 +856,6 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
       }
       
       toast.success(resultMessage);
-      
-      // Guardar estado en localStorage
       saveSubmissionState();
       
     } catch (error) {
@@ -1010,6 +986,7 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [fileType, setFileType] = useState<string | null>(null);
     
     useEffect(() => {
       const loadPreview = async () => {
@@ -1019,12 +996,19 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             throw new Error('No file ID provided');
           }
           
-          // Create secure preview URL using relative path
-          const url = `/api/proxy/file-storage/download/${fileId}`;
-          setPreviewUrl(url);
+          // First, try to get file metadata to determine type
+          const metadataResponse = await fetch(`/api/proxy/file-storage/metadata/${fileId}`);
+          if (metadataResponse.ok) {
+            const metadata = await metadataResponse.json();
+            setFileType(metadata.contentType);
+          }
+          
+          // Create preview URL
+          const previewUrl = `/api/proxy/file-storage/download/${fileId}?preview=true`;
+          setPreviewUrl(previewUrl);
           
           // Check if file is accessible
-          const checkResponse = await fetch(url, { method: 'HEAD' });
+          const checkResponse = await fetch(previewUrl, { method: 'HEAD' });
           if (!checkResponse.ok) {
             throw new Error('No se pudo acceder al archivo');
           }
@@ -1089,13 +1073,43 @@ export default function ActivityPage({ params }: { params: { id: string } }) {
             </Button>
           </div>
         )}
-        <div className="border rounded-md overflow-hidden">
-          <iframe 
-            src={previewUrl}
-            className="w-full h-[400px]" 
-            title="Vista previa"
-            sandbox="allow-same-origin allow-scripts"
-          />
+        <div className="border rounded-md overflow-hidden bg-white">
+          {fileType?.startsWith('image/') ? (
+            <img 
+              src={previewUrl} 
+              alt="Vista previa" 
+              className="w-full h-[400px] object-contain"
+            />
+          ) : fileType?.startsWith('video/') ? (
+            <video 
+              src={previewUrl} 
+              controls 
+              className="w-full h-[400px]"
+            >
+              Tu navegador no soporta la reproducción de video.
+            </video>
+          ) : fileType === 'application/pdf' ? (
+            <iframe 
+              src={previewUrl}
+              className="w-full h-[400px]" 
+              title="Vista previa PDF"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[400px] gap-4">
+              <FileText className="h-16 w-16 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Vista previa no disponible para este tipo de archivo
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => downloadFile(fileId)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar archivo
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
