@@ -46,14 +46,16 @@ public class StorageController {
     }
 
     @GetMapping("/download/{id}")
-    @CrossOrigin(origins = "*", allowedHeaders = "*", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
+    @CrossOrigin(allowCredentials = "true", exposedHeaders = {"Content-Disposition", "Content-Type", "Content-Length"})
     public ResponseEntity<?> downloadFile(@PathVariable String id, 
                                          @RequestParam(required = false, defaultValue = "false") boolean preview,
-                                         @RequestHeader(value = "Authorization", required = false) String authHeader) {
+                                         @RequestHeader(value = "Authorization", required = false) String authHeader,
+                                         @RequestHeader(value = "Origin", required = false) String origin) {
         try {
             System.out.println("Download request for file ID: " + id);
             System.out.println("Preview mode: " + preview);
             System.out.println("Auth header present: " + (authHeader != null ? "yes" : "no"));
+            System.out.println("Origin: " + (origin != null ? origin : "null"));
             
             var fileData = storageService.downloadFile(id);
             String contentType = determineContentType(fileData.getFileName(), fileData.getContentType());
@@ -64,7 +66,14 @@ public class StorageController {
             
             // Create headers with extensive CORS settings
             HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
+            
+            // When credentials are true, we must reflect the actual origin
+            if (origin != null) {
+                headers.add("Access-Control-Allow-Origin", origin);
+            } else {
+                headers.add("Access-Control-Allow-Origin", "http://localhost:3000");
+            }
+            
             headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD");
             headers.add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
             headers.add("Access-Control-Expose-Headers", "Content-Disposition, Content-Type, Content-Length, X-Content-Type-Options");
@@ -117,9 +126,17 @@ public class StorageController {
             
             // Return error response with CORS headers
             HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
+            
+            // When credentials are true, we must reflect the actual origin
+            if (origin != null) {
+                headers.add("Access-Control-Allow-Origin", origin);
+            } else {
+                headers.add("Access-Control-Allow-Origin", "http://localhost:3000");
+            }
+            
             headers.add("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD");
             headers.add("Access-Control-Allow-Headers", "*");
+            headers.add("Access-Control-Allow-Credentials", "true");
             
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to download file: " + e.getMessage());

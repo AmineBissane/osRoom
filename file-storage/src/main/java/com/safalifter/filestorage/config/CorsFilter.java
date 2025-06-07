@@ -23,7 +23,18 @@ public class CorsFilter implements Filter {
         String origin = request.getHeader("Origin");
         
         // CRITICAL: Set CORS headers BEFORE any processing
-        response.setHeader("Access-Control-Allow-Origin", "*");
+        // When allowCredentials is true, we must reflect the actual origin instead of using *
+        if (origin != null) {
+            response.setHeader("Access-Control-Allow-Origin", origin);
+        } else {
+            // For requests without Origin header, you can either:
+            // 1. Set a default origin
+            response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+            // 2. Or use * but then disable credentials
+            // response.setHeader("Access-Control-Allow-Origin", "*");
+            // response.setHeader("Access-Control-Allow-Credentials", "false");
+        }
+        
         response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH");
         response.setHeader("Access-Control-Max-Age", "3600");

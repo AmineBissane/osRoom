@@ -21,7 +21,7 @@ public class FileStorageApplication {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("*")
+                        .allowedOriginPatterns("*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH")
                         .allowedHeaders("*")
                         .exposedHeaders("Content-Disposition", "Content-Type", "Content-Length", "Accept-Ranges")
