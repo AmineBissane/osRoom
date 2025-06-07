@@ -1050,7 +1050,28 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     const handleOpenInNewTab = useCallback(() => {
       if (!fileId) return;
       console.log('Abriendo documento en nueva pestaña:', fileUrl);
-      window.open(fileUrl, '_blank');
+      // Use fetch instead of window.open for better control
+      fetch(fileUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': '*/*'
+        }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.blob();
+      })
+      .then(blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        window.open(objectUrl, '_blank');
+        // Clean up after a delay to ensure the window has time to use the URL
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      })
+      .catch(e => {
+        console.error('Error opening in new tab:', e);
+        // Fallback to direct window.open
+        window.open(fileUrl, '_blank');
+      });
     }, [fileId, fileUrl]);
     
     // Manejar descarga
@@ -1504,11 +1525,12 @@ export default function ActivityPage({ params }: { params: { activityId: string 
             </div>
           )}
           
-          <iframe 
+          {/* Using object tag instead of iframe for better file handling */}
+          <object 
             key={`document-preview-${fileId}-${retryCount}`}
-            src={fileUrl}
+            data={fileUrl}
+            type="application/pdf"
             className={`w-full h-full border-0 ${isLoading || error ? 'hidden' : ''}`}
-            title="Document Preview"
             onLoad={() => {
               console.log('Documento cargado correctamente');
               setIsLoading(false);
@@ -1518,8 +1540,14 @@ export default function ActivityPage({ params }: { params: { activityId: string 
               setIsLoading(false);
               setError('No se pudo cargar el documento. Utilice los botones para abrir o descargar el documento.');
             }}
-            allow="fullscreen"
-          />
+          >
+            <p className="text-center p-4">
+              El navegador no puede mostrar este documento. 
+              <Button onClick={handleDownload} variant="link" className="ml-2">
+                Descargar archivo
+              </Button>
+            </p>
+          </object>
         </div>
       </div>
     );

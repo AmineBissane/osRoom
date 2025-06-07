@@ -128,7 +128,7 @@ export async function GET(
       const headers = new Headers();
       headers.set('Content-Type', contentType);
       headers.set('Content-Disposition', disposition);
-      headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      headers.set('Cache-Control', 'no-transform, no-store, no-cache, must-revalidate, proxy-revalidate');
       headers.set('Pragma', 'no-cache');
       headers.set('Expires', '0');
       
@@ -146,6 +146,12 @@ export async function GET(
       if (contentType.includes('pdf')) {
         headers.set('Content-Type', 'application/pdf');
       }
+      
+      // Add explicit no-transform header to prevent any proxy modifications
+      headers.set('Cache-Control', 'no-transform, no-store, no-cache, must-revalidate, proxy-revalidate');
+      
+      // Set response type to ensure browser treats as download/blob
+      headers.set('X-Content-Type-Options', 'nosniff');
       
       // Return the response with appropriate headers
       return new NextResponse(data, {
