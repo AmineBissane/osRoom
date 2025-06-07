@@ -22,6 +22,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Create controller for request timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout (reduced from 20)
+  
   try {
     // Use utility function to safely get route params
     const { id } = await getRouteParams(params);
@@ -33,6 +37,7 @@ export async function GET(
     const token = getAccessToken(request);
     
     if (!token) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'No authentication token found' },
         { status: 401 }
@@ -45,53 +50,51 @@ export async function GET(
     const cleanToken = formatBearerToken(token);
     
     // Make the request to the API directly
-    // Try both URLs since there appears to be configuration inconsistency
-    // First try the localhost URL (configured in direct-view)
-    const backendUrls = [
-      `http://localhost:8222/api/v1/file-storage/download/${id}?preview=${isPreview}`,
-      `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`
-    ];
-    
-    // Use AbortController to add timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    // Try the primary URL first with a shorter timeout
+    const backendUrl = `http://localhost:8222/api/v1/file-storage/download/${id}?preview=${isPreview}`;
+    const fallbackUrl = `http://82.29.168.17:8030/api/v1/file-storage/download/${id}?preview=${isPreview}`;
     
     let response = null;
     let error = null;
     
     try {
-      // Try each URL in sequence
-      for (const apiUrl of backendUrls) {
-        console.log(`Attempting request to: ${apiUrl}`);
+      // Try primary URL first
+      console.log(`Attempting request to: ${backendUrl}`);
+      
+      response = await fetch(backendUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': cleanToken,
+          'Accept': '*/*',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      
+      console.log(`Response status from ${backendUrl}: ${response.status}`);
+      
+      // If primary URL fails, try fallback
+      if (!response.ok) {
+        console.log(`Primary URL failed with status ${response.status}, trying fallback URL`);
         
-        try {
-          // Use simple fetch with no streaming for reliability
-          response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': cleanToken,
-              'Accept': '*/*',
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
-            },
-            cache: 'no-store',
-            signal: controller.signal
-          });
-          
-          console.log(`Response status from ${apiUrl}: ${response.status}`);
-          
-          if (response.ok) {
-            // We got a successful response, break out of the loop
-            break;
-          }
-        } catch (urlError) {
-          console.error(`Error with URL ${apiUrl}:`, urlError);
-          error = urlError;
-          // Continue to the next URL
-        }
+        response = await fetch(fallbackUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': cleanToken,
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        
+        console.log(`Response status from ${fallbackUrl}: ${response.status}`);
       }
       
-      // Clear the timeout since requests completed
+      // Clear the timeout since request completed
       clearTimeout(timeoutId);
       
       // If we still don't have a valid response, throw an error
@@ -112,8 +115,14 @@ export async function GET(
         ? 'inline'
         : (contentDisposition || `attachment; filename="file-${id}"`);
       
-      // Get the response data as array buffer
-      const data = await response.arrayBuffer();
+      // Get the response data as array buffer with timeout protection
+      const dataPromise = response.arrayBuffer();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Data fetch timeout')), 8000);
+      });
+      
+      // Race the data fetch against a timeout
+      const data = await Promise.race([dataPromise, timeoutPromise]) as ArrayBuffer;
       
       // Set appropriate headers for CORS and content handling
       const headers = new Headers();
@@ -128,6 +137,7 @@ export async function GET(
       headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
       headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       headers.set('Access-Control-Allow-Credentials', 'true');
+      headers.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
       
       // Add content length to help browsers properly load the file
       headers.set('Content-Length', data.byteLength.toString());
@@ -150,7 +160,13 @@ export async function GET(
         console.error('Request to backend timed out');
         return NextResponse.json(
           { error: 'Request to backend timed out', details: 'The connection to the server timed out' },
-          { status: 504 }  // Gateway Timeout
+          { 
+            status: 504,  // Gateway Timeout
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json'
+            }
+          }
         );
       }
       
@@ -162,7 +178,28 @@ export async function GET(
         console.error('Connection reset error when fetching from backend:', fetchError);
         return NextResponse.json(
           { error: 'Connection reset', details: 'The connection to the server was reset' },
-          { status: 502 }  // Bad Gateway
+          { 
+            status: 502,  // Bad Gateway
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
+      
+      // Handle data fetch timeout
+      if (fetchError instanceof Error && fetchError.message === 'Data fetch timeout') {
+        console.error('Data fetch timed out');
+        return NextResponse.json(
+          { error: 'Data fetch timed out', details: 'Timeout while retrieving file data' },
+          { 
+            status: 504,  // Gateway Timeout
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json'
+            }
+          }
         );
       }
       
@@ -170,6 +207,9 @@ export async function GET(
       throw fetchError;
     }
   } catch (error) {
+    // Clear the timeout to prevent memory leaks
+    clearTimeout(timeoutId);
+    
     console.error('Proxy error:', error);
     
     // Create a more detailed error response
@@ -182,7 +222,13 @@ export async function GET(
         details: errorMessage,
         type: errorName
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        }
+      }
     );
   }
 } 

@@ -988,10 +988,10 @@ export default function ActivityPage({ params }: { params: { activityId: string 
   const saveGrade = () => {};
 
   // Function to get a file URL for download or preview
-  const getFileUrl = (fileId: string | undefined): string => {
+  const getFileUrl = (fileId: string | undefined, preview: boolean = false): string => {
     if (!fileId) return '';
     // Use relative path to ensure secure connection
-    return `/api/proxy/file-storage/download/${fileId}`;
+    return `/api/proxy/file-storage/download/${fileId}?preview=${preview}`;
   };
 
   // DocumentPreview component optimizado con memo para evitar re-renderizados
@@ -1057,8 +1057,17 @@ export default function ActivityPage({ params }: { params: { activityId: string 
     const handleDownload = useCallback(() => {
       if (!fileId) return;
       console.log('Descargando documento:', fileId);
-      downloadFile(fileId);
-    }, [fileId]);
+      
+      // Instead of using the downloadFile function which has issues
+      // Use direct browser download with proper parameters
+      const downloadUrl = getFileUrl(fileId, false);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName || `file-${fileId}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, [fileId, fileName]);
     
     // Manejar reintentos
     const handleRetry = useCallback(() => {
@@ -1150,60 +1159,77 @@ export default function ActivityPage({ params }: { params: { activityId: string 
           
           // Si no hay metadatos, intentar hacer HEAD al archivo para verificar el tipo MIME
           try {
-            const headResponse = await fetch(getFileUrl(fileId, true), {
-              method: 'HEAD',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
+            const headController = new AbortController();
+            const headTimeoutId = setTimeout(() => headController.abort(), 5000);
             
-            if (headResponse.ok) {
-              const contentType = headResponse.headers.get('content-type');
-              const contentDisposition = headResponse.headers.get('content-disposition');
+            try {
+              const headResponse = await fetch(getFileUrl(fileId, true), {
+                method: 'HEAD',
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                },
+                signal: headController.signal
+              });
               
-              console.log('Content-Type:', contentType);
-              console.log('Content-Disposition:', contentDisposition);
+              clearTimeout(headTimeoutId);
               
-              // Obtener nombre de archivo de Content-Disposition si está disponible
-              if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-                if (filenameMatch && filenameMatch[1]) {
-                  const extractedName = filenameMatch[1];
-                  setFileName(extractedName);
+              if (headResponse.ok) {
+                const contentType = headResponse.headers.get('content-type');
+                const contentDisposition = headResponse.headers.get('content-disposition');
+                
+                console.log('Content-Type:', contentType);
+                console.log('Content-Disposition:', contentDisposition);
+                
+                // Obtener nombre de archivo de Content-Disposition si está disponible
+                if (contentDisposition) {
+                  const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                  if (filenameMatch && filenameMatch[1]) {
+                    const extractedName = filenameMatch[1];
+                    setFileName(extractedName);
+                    
+                    if (isNonViewableExtension(extractedName)) {
+                      setAsNonViewable(extractedName);
+                      return;
+                    }
+                  }
+                }
+                
+                // Verificar el tipo MIME
+                if (contentType) {
+                  const nonViewableMimeTypes = [
+                    'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
+                    'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
+                    'application/java-archive'
+                  ];
                   
-                  if (isNonViewableExtension(extractedName)) {
-                    setAsNonViewable(extractedName);
+                  if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
+                    console.log(`Archivo no visualizable detectado por MIME type: ${contentType}`);
+                    // Usar el nombre de archivo del fileId si no tenemos uno mejor
+                    if (!fileName) {
+                      const inferredName = fileId.split('/').pop() || 'archivo';
+                      setFileName(inferredName);
+                      setFileType(contentType.split('/').pop() || 'archivo');
+                    }
+                    setIsNonViewableFile(true);
+                    setIsLoading(false);
+                    setDisplayMode('buttons');
+                    setShouldAutoDownload(true);
                     return;
                   }
                 }
+              } else {
+                console.warn(`HEAD request failed with status: ${headResponse.status}`);
               }
-              
-              // Verificar el tipo MIME
-              if (contentType) {
-                const nonViewableMimeTypes = [
-                  'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed',
-                  'application/octet-stream', 'application/x-msdownload', 'application/x-executable',
-                  'application/java-archive'
-                ];
-                
-                if (nonViewableMimeTypes.some(mime => contentType.includes(mime))) {
-                  console.log(`Archivo no visualizable detectado por MIME type: ${contentType}`);
-                  // Usar el nombre de archivo del fileId si no tenemos uno mejor
-                  if (!fileName) {
-                    const inferredName = fileId.split('/').pop() || 'archivo';
-                    setFileName(inferredName);
-                    setFileType(contentType.split('/').pop() || 'archivo');
-                  }
-                  setIsNonViewableFile(true);
-                  setIsLoading(false);
-                  setDisplayMode('buttons');
-                  setShouldAutoDownload(true);
-                  return;
-                }
+            } catch (headAbortError: any) {
+              if (headAbortError.name === 'AbortError') {
+                console.warn('HEAD request timed out');
+              } else {
+                throw headAbortError; // re-throw non-timeout errors
               }
             }
           } catch (headError) {
             console.error('Error al verificar cabeceras del archivo:', headError);
+            // Continue without HEAD info - don't fail the whole preview
           }
           
         } catch (error) {
@@ -1262,6 +1288,45 @@ export default function ActivityPage({ params }: { params: { activityId: string 
         return () => clearTimeout(timer);
       }
     }, [isNonViewableFile, fileId, handleDownload]);
+    
+    // Implement a timeout for iframe loading
+    useEffect(() => {
+      if (displayMode === 'iframe' && isLoading && fileId) {
+        console.log('Setting iframe loading timeout');
+        const timeoutId = setTimeout(() => {
+          console.log('Iframe loading timeout reached');
+          setIsLoading(false);
+          setError('El tiempo de carga ha expirado. Intente usar los botones para abrir o descargar el documento.');
+          // Don't switch to buttons mode automatically to give the iframe a chance
+          // if it's still loading but taking time
+        }, 8000); // 8 seconds timeout
+        
+        return () => {
+          clearTimeout(timeoutId);
+          console.log('Cleared iframe loading timeout');
+        };
+      }
+    }, [displayMode, isLoading, fileId]);
+    
+    // Implement a fallback for CORS issues with iframe
+    useEffect(() => {
+      if (fileId && displayMode === 'iframe') {
+        // Add an event listener to catch CORS errors that might not trigger onError
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data && event.data.type === 'pdf-loading-error') {
+            console.error('PDF loading error message received');
+            setIsLoading(false);
+            setError('Error al cargar el PDF. Pruebe a descargar el archivo.');
+          }
+        };
+        
+        window.addEventListener('message', handleMessage);
+        
+        return () => {
+          window.removeEventListener('message', handleMessage);
+        };
+      }
+    }, [fileId, displayMode]);
     
     // Si no hay fileId, mostrar error
     if (!fileId) {
