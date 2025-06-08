@@ -89,8 +89,11 @@ public class KeycloakTokenService {
             
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
             
+            String tokenUrl = keycloakServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+            log.debug("Token URL: {}", tokenUrl);
+            
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    keycloakServerUrl + "/realms/" + realm + "/protocol/openid-connect/token", 
+                    tokenUrl, 
                     request, 
                     Map.class);
             
@@ -103,7 +106,7 @@ public class KeycloakTokenService {
                 throw new RuntimeException("Failed to get service account token from Keycloak");
             }
         } catch (Exception e) {
-            log.error("Error getting service account token from Keycloak", e);
+            log.error("Error getting service account token from Keycloak: {}", e.getMessage(), e);
             throw new RuntimeException("Error getting service account token from Keycloak", e);
         }
     }

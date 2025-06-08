@@ -38,11 +38,15 @@ public class UserService {
                 ? authHeader 
                 : keycloakTokenService.getServiceAccountToken();
             
+            log.debug("Using token: {}", token.substring(0, Math.min(30, token.length())) + "...");
+            
             List<Map<String, Object>> users = keycloakClient.getAllUsers(realm, token);
             log.debug("Successfully fetched {} users from Keycloak", users.size());
             return users;
         } catch (FeignException e) {
             log.error("Error fetching all users from Keycloak: {} - {}", e.status(), e.getMessage());
+            log.error("Request URL: {}", e.request().url());
+            log.error("Request headers: {}", e.request().headers());
             handleFeignException(e);
             // This will never be reached due to the exception being thrown in handleFeignException
             return Collections.emptyList();
