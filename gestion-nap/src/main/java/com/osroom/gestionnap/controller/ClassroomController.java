@@ -99,7 +99,7 @@ public class ClassroomController {
                             // Get a token for Keycloak
                             String token = (authHeader != null && !authHeader.isBlank()) 
                                 ? authHeader 
-                                : keycloakTokenService.getAdminToken();
+                                : keycloakTokenService.getServiceAccountToken();
                             
                             List<Map<String, Object>> realStudents = new ArrayList<>();
                             List<Map<String, Object>> dummyStudents = new ArrayList<>();

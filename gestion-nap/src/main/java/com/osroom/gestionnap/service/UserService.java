@@ -36,7 +36,7 @@ public class UserService {
             // Use provided auth header or get a new token
             String token = (authHeader != null && !authHeader.isBlank()) 
                 ? authHeader 
-                : keycloakTokenService.getAdminToken();
+                : keycloakTokenService.getServiceAccountToken();
             
             List<Map<String, Object>> users = keycloakClient.getAllUsers(realm, token);
             log.debug("Successfully fetched {} users from Keycloak", users.size());
@@ -65,7 +65,7 @@ public class UserService {
             // Use provided auth header or get a new token
             String token = (authHeader != null && !authHeader.isBlank()) 
                 ? authHeader 
-                : keycloakTokenService.getAdminToken();
+                : keycloakTokenService.getServiceAccountToken();
             
             Map<String, Object> user = keycloakClient.getUserById(realm, userId, token);
             log.debug("Successfully fetched user from Keycloak: {}", userId);
@@ -94,7 +94,7 @@ public class UserService {
             // Use provided auth header or get a new token
             String token = (authHeader != null && !authHeader.isBlank()) 
                 ? authHeader 
-                : keycloakTokenService.getAdminToken();
+                : keycloakTokenService.getServiceAccountToken();
             
             List<Map<String, Object>> users = keycloakClient.searchUsers(realm, query, token);
             log.debug("Successfully searched users in Keycloak, found: {}", users.size());

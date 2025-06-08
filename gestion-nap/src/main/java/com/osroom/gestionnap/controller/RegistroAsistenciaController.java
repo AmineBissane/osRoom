@@ -142,10 +142,10 @@ public class RegistroAsistenciaController {
                         System.out.println("Found " + studentIds.size() + " student IDs in classroom data");
                         
                         if (!studentIds.isEmpty()) {
-                            // Get a token for Keycloak if needed
+                            // Get a token for Keycloak
                             String token = (authHeader != null && !authHeader.isBlank()) 
                                 ? authHeader 
-                                : keycloakTokenService.getAdminToken();
+                                : keycloakTokenService.getServiceAccountToken();
                             
                             // Generate attendance records for each student
                             for (Object studentIdObj : studentIds) {
@@ -390,10 +390,10 @@ public class RegistroAsistenciaController {
                 List<Object> studentIds = (List<Object>) classroom.get("studentIds");
                 System.out.println("Found " + studentIds.size() + " student IDs in classroom data");
                 
-                // Get a token for Keycloak if needed
+                // Get a token for Keycloak
                 String token = (authHeader != null && !authHeader.isBlank()) 
                     ? authHeader 
-                    : keycloakTokenService.getAdminToken();
+                    : keycloakTokenService.getServiceAccountToken();
                 
                 Random random = new Random();
                 LocalDate finalFecha = fecha; // Need a final reference for lambda
@@ -637,7 +637,7 @@ public class RegistroAsistenciaController {
                             // Get a token for Keycloak
                             String token = (authHeader != null && !authHeader.isBlank()) 
                                 ? authHeader 
-                                : keycloakTokenService.getAdminToken();
+                                : keycloakTokenService.getServiceAccountToken();
                             
                             List<Map<String, Object>> realStudents = new ArrayList<>();
                             List<Map<String, Object>> dummyStudents = new ArrayList<>();

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +24,7 @@ public class RegistroAsistenciaService {
     private final KeycloakClient keycloakClient;
     private final ClassroomClient classroomClient;
     private final NotificacionService notificacionService;
+    private final KeycloakTokenService keycloakTokenService;
     
     @Value("${app.keycloak.realm:osRoom}")
     private String realm;
@@ -109,8 +111,13 @@ public class RegistroAsistenciaService {
     public List<RegistroAsistencia> registrarAsistenciaClase(Long claseId, LocalDate fecha, String profesorId, 
                                                            String profesorNombre, String authHeader) {
         try {
+            // Use provided auth header or get a service account token
+            String token = (authHeader != null && !authHeader.isBlank()) 
+                ? authHeader 
+                : keycloakTokenService.getServiceAccountToken();
+                
             // Obtener información de la clase
-            Map<String, Object> classroom = classroomClient.getClassroomById(claseId, authHeader);
+            Map<String, Object> classroom = classroomClient.getClassroomById(claseId, token);
             String className = (String) classroom.get("name");
             
             // Obtener lista de estudiantes de la clase
@@ -126,7 +133,7 @@ public class RegistroAsistenciaService {
                 String studentId = String.valueOf(studentIdLong);
                 
                 // Obtener información del estudiante desde Keycloak
-                Map<String, Object> student = keycloakClient.getUserById(realm, studentId, authHeader);
+                Map<String, Object> student = keycloakClient.getUserById(realm, studentId, token);
                 String studentName = student.get("firstName") + " " + student.get("lastName");
                 
                 RegistroAsistencia registro = RegistroAsistencia.builder()
@@ -326,9 +333,14 @@ public class RegistroAsistenciaService {
         Map<String, Map<String, Object>> studentData = new HashMap<>();
         
         try {
+            // Use provided auth header or get a service account token
+            String token = (authHeader != null && !authHeader.isBlank()) 
+                ? authHeader 
+                : keycloakTokenService.getServiceAccountToken();
+                
             for (String studentId : studentIds) {
                 try {
-                    Map<String, Object> userData = keycloakClient.getUserById(realm, studentId, authHeader);
+                    Map<String, Object> userData = keycloakClient.getUserById(realm, studentId, token);
                     if (userData != null) {
                         studentData.put(studentId, userData);
                     }

@@ -50,18 +50,18 @@ public class TestController {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            String adminToken = keycloakTokenService.getAdminToken();
+            String serviceToken = keycloakTokenService.getServiceAccountToken();
             response.put("status", "success");
-            response.put("message", "Successfully obtained admin token from Keycloak");
-            response.put("adminTokenLength", adminToken.length());
-            response.put("adminTokenPrefix", adminToken.substring(0, 20) + "...");
+            response.put("message", "Successfully obtained token from Keycloak");
+            response.put("serviceTokenLength", serviceToken.length());
+            response.put("serviceTokenPrefix", serviceToken.substring(0, 20) + "...");
             
             try {
-                String serviceToken = keycloakTokenService.getServiceAccountToken();
-                response.put("serviceTokenLength", serviceToken.length());
-                response.put("serviceTokenPrefix", serviceToken.substring(0, 20) + "...");
+                String adminToken = keycloakTokenService.getAdminToken();
+                response.put("adminTokenLength", adminToken.length());
+                response.put("adminTokenPrefix", adminToken.substring(0, 20) + "...");
             } catch (Exception e) {
-                response.put("serviceTokenError", e.getMessage());
+                response.put("adminTokenError", e.getMessage());
             }
             
             return ResponseEntity.ok(response);

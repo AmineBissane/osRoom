@@ -57,7 +57,7 @@ public class GestionNapApplication {
             Random random = new Random();
             
             try {
-                String token = keycloakTokenService.getAdminToken();
+                String token = keycloakTokenService.getServiceAccountToken();
                 List<Map<String, Object>> classrooms = new ArrayList<>();
                 
                 try {
