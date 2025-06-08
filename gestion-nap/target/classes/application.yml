@@ -80,8 +80,8 @@ app:
   keycloak:
     server-url: ${KEYCLOAK_URL:http://82.29.168.17:8080}
     realm: ${KEYCLOAK_REALM:osRoom}
-    client-id: backendgateway
-    client-secret: MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj
+    client-id: realm-management
+    client-secret: jVOCKcwVohkdO4gYKMzsG5KcMpxh8W8e
   services:
     classrooms-url: ${CLASSROOMS_URL:http://82.29.168.17:8000}
 
