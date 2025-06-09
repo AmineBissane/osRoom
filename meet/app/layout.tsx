@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from 'next';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'),
   title: {
     default: 'osRoom | Virtual Meeting Platform',
     template: '%s',
