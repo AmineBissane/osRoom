@@ -43,20 +43,12 @@ services:
 
   livekit:
     image: livekit/livekit-server
-    container_name: livekit-server
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-60000:50000-60000/udp"  # Cambiar esto - rango completo UDP
+      - "7882:7882/udp"
     environment:
       - "LIVEKIT_KEYS=devkey: Xj93YhGq7vLZPtb9KsWnAeM8rqFYgTEq"
-      - "LIVEKIT_PORT=7880"
-      - "LIVEKIT_RTC_TCP_PORT=7881"
-      - "LIVEKIT_RTC_UDP_PORT_RANGE_START=50000"
-      - "LIVEKIT_RTC_UDP_PORT_RANGE_END=60000"
-      - "LIVEKIT_EXTERNAL_IP=82.29.168.17"  # Tu IP externa
-      - "LIVEKIT_LOG_LEVEL=debug"
-    restart: unless-stopped
 
 
   config-server:
