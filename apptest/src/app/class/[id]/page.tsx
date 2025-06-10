@@ -664,7 +664,7 @@ export default function ClassPage({ params }: { params: { id: string } }) {
   // Add a function to handle joining the meet
   const handleJoinMeet = () => {
     // Redirect to the LiveKit endpoint with classroom name and ID
-    window.location.href = `http://82.29.168.17:3001/rooms/${classDetails.name.replace(/\s+/g, '')}${id}`;
+    window.location.href = `http://localhost:3001/rooms/${classDetails.name.replace(/\s+/g, '')}${id}`;
     // Alternatively, if you want to use Next.js router:
     // router.push(`http://82.29.168.17:3000/${classDetails.name.replace(/\s+/g, '')}${id}`);
   };
