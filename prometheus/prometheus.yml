@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'spring-boot-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['gestion-nap:8226', 'discovery:8761', 'config-server:8888', 'gateway:8222', 
+                 'student:8090', 'classrooms:8000', 'activities:8010', 'activitiesresponses:8020',
+                 'file-storage:8030', 'school:8070']
+
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgresql:5432']
+
+  - job_name: 'keycloak'
+    static_configs:
+      - targets: ['keycloak:8080'] 
