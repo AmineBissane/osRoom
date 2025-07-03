@@ -5,7 +5,7 @@ const handler = NextAuth({
   providers: [
     KeycloakProvider({
       clientId: process.env.KEYCLOAK_ID || "backendgateway",
-      clientSecret: process.env.KEYCLOAK_SECRET || "MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj",
+      clientSecret: process.env.KEYCLOAK_SECRET || "jnhpOE1sJfJmdRaRDyzsWPCFBoGC1gey",
       issuer: process.env.KEYCLOAK_ISSUER || "http://82.29.168.17:8080/realms/osRoom",
       authorization: { params: { scope: "openid email profile" } },
       token: {

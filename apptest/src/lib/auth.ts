@@ -11,7 +11,7 @@ export async function authenticateWithKeycloak(username: string, password: strin
     username,
     password,
     client_id: process.env.NEXT_PUBLIC_KEYCLOAK_ID || 'backendgateway',
-    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj',
+    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'jnhpOE1sJfJmdRaRDyzsWPCFBoGC1gey',
     grant_type: 'password',
     scope: 'openid'
   });
@@ -46,7 +46,7 @@ export async function authenticateWithKeycloak(username: string, password: strin
 export async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
   const formData = new URLSearchParams({
     client_id: process.env.NEXT_PUBLIC_KEYCLOAK_ID || 'backendgateway',
-    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj',
+    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'jnhpOE1sJfJmdRaRDyzsWPCFBoGC1gey',
     grant_type: 'refresh_token',
     refresh_token: refreshToken
   });

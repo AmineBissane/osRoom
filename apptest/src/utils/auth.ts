@@ -87,7 +87,7 @@ export async function refreshToken(refreshToken: string) {
   
   const formData = new URLSearchParams({
     client_id: process.env.NEXT_PUBLIC_KEYCLOAK_ID || 'backendgateway',
-    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'MYlMMYC1khs8vHXqoOgu0CEAEPPiykbj',
+    client_secret: process.env.NEXT_PUBLIC_KEYCLOAK_SECRET || 'jnhpOE1sJfJmdRaRDyzsWPCFBoGC1gey',
     grant_type: 'refresh_token',
     refresh_token: refreshToken
   });
