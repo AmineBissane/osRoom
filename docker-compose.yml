@@ -445,7 +445,7 @@ services:
           memory: 256M
           cpus: '0.3'
 
-  # Prometheus for metrics collection and storage
+  # Prometheus for metrics collection and storagee
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
